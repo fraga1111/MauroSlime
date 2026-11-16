@@ -1,0 +1,3 @@
+# i file .bat restano in formato Windows (CRLF), anche scaricati da GitHub
+*.bat -text
+*.cmd -text
