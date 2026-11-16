@@ -1,0 +1,146 @@
+# MauroSlime — guida al progetto
+
+Sparatutto in prima/terza persona fatto in **Godot 4.7.2 + GDScript**. Il giocatore è un omino alto
+10 cm dentro un vero ufficio di circa 3 × 4,5 m (ricostruito dalle foto in `ft/`) e combatte ondate di slime.
+**Tutto è generato da codice**: niente modelli 3D o scene da editor (c'è solo `main.tscn`, vuota).
+Eccezioni: le texture delle persone vere (Matteo, Broski) sono ritagli delle loro foto (`StanzaFPS/textures/persone/`),
+e una persona vera può avere un modello fatto in Blender (`StanzaFPS/modelli/<look>.glb`): se c'è, il gioco usa quello.
+
+Questa guida serve a chiunque modifichi il gioco (persone o IA). Lingua del progetto: **italiano**
+(commenti, testi a schermo, nomi dei file di dati).
+
+## Cartelle
+
+```
+MauroSlime/
+├─ Gioca.bat               avvia il gioco: copia StanzaFPS in %LOCALAPPDATA%\MauroSlime, la prepara e la avvia da lì
+│                          (così si gioca anche da una cartella OneDrive condivisa senza conflitti)
+├─ Apri editor Godot.bat   apre il progetto nell'editor
+├─ Godot/                  motore (Godot_v4.7.2-stable_win64.exe + _console.exe)
+├─ ft/                     foto della stanza vera + planimetria.pdf (riferimento per room.gd)
+├─ persongg/               foto delle persone vere (riferimento per data/looks.gd)
+├─ blender/                file .blend delle persone (da aprire e ritoccare in Blender) + texture cotte
+└─ StanzaFPS/              PROGETTO GODOT
+   ├─ project.godot, main.tscn
+   ├─ scripts/
+   │  ├─ config.gd              TUTTI i numeri di bilanciamento + scala S + livelli di collisione
+   │  ├─ main.gd                regia: stanza → menu → partita; collega i segnali
+   │  ├─ data/characters.gd     i personaggi giocabili (dati puri): tutti uguali, cambia solo l'aspetto
+│  ├─ data/weapons.gd        le armi (evidenziatore, spillatrice, telefono, spillatrice a pinza)
+   │  ├─ data/looks.gd          aspetto delle persone vere (Matteo, Broski): forme arrotondate + foto
+   │  ├─ data/looks_minecraft.gd  versione "Minecraft" (a cubi) di Matteo e Broski
+   │  ├─ world/room.gd          DISPOSIZIONE dell'ufficio (solo layout, a sezioni)
+   │  ├─ world/kit.gd           funzioni per costruire: box, cyl, sphere, quad, mat, emis, glass...
+   │  ├─ world/textures.gd      texture procedurali (moquette, vista finestra, schermi...)
+   │  ├─ world/world_setup.gd   ambiente/luce generale + mesh di navigazione dei nemici
+   │  ├─ actors/player.gd       giocatore: movimento, telecamere 1ª/3ª persona, sparo
+   │  ├─ actors/character_model.gd  omino a blocchi / persona con foto + animazioni (copricapi qui)
+   │  ├─ actors/gun_models.gd   modelli delle armi (oggetti d'ufficio, ricostruiti dalle foto)
+   │  ├─ actors/slime.gd        nemico
+   │  ├─ actors/avatar.gd       omino di un ALTRO giocatore in multiplayer (mosso dalla rete)
+   │  ├─ game/waves.gd          ondate, comparsa slime, punteggio
+   │  ├─ game/input_setup.gd    tasti
+   │  ├─ game/rete.gd           MULTIPLAYER in rete locale: ospita / unisciti, faro per trovare le partite, versione
+   │  ├─ game/munizioni.gd      scatole di graffette a terra (un caricatore in più per ogni arma)
+   │  ├─ actors/effetti.gd      colpi luminosi (tracer) e segni sui muri (buco o macchia colorata)
+   │  ├─ ui/hud.gd              interfaccia in partita
+   │  ├─ ui/menu.gd             schede del menu iniziale
+   │  └─ ui/menu_stage.gd       vetrina 3D del menu (omini + telecamera)
+   ├─ modelli/                modelli .glb esportati da Blender (es. matteo.glb); li usa character_model.gd
+   ├─ textures/persone/       ritagli delle foto di persongg/ (li crea tools/foto_personaggi.py)
+   ├─ archivio_personaggi_cubetti/  vecchia versione a quadratini di Matteo e Broski
+   └─ tools/
+      ├─ check.sh               controllo completo (vedi "Verificare")
+      ├─ test_enemies.gd        test automatico dei nemici
+      ├─ test_moves.gd          test di corsa, scivolata, a terra, visuale frontale, super salto (sedia)
+      ├─ ritratti.gd            screenshot di tutti i personaggi (davanti, 3/4, fianco, dietro)
+      ├─ armi.gd                primo piano di tutte le armi (fianco, alto, dietro)
+      ├─ graffette.gd           primo piano della scatola di graffette e delle macchie fluo
+      ├─ blender_persona.py     crea in Blender una persona di looks.gd (.blend + modelli/<look>.glb)
+      ├─ blender_testa.py       testa anatomica (naso, orbite, labbra, mento, orecchie) misurata sulla foto frontale
+      ├─ foto_personaggi.py     ritaglia le foto di persongg/ in textures/persone/ (Python + Pillow + numpy)
+      ├─ primo_piano.sh         primi piani di Matteo e Broski -> tools/shots/primi_piani.png
+      └─ shots/                 screenshot generati da check.sh --shots
+```
+
+## Convenzioni (importanti)
+
+- **Scala**: nella stanza e nei mobili si scrive in **metri reali**; `kit.gd` moltiplica per
+  `Config.S = 18`. Personaggi, armi, velocità e telecamere sono invece in **metri di gioco**
+  (omino = 1,8 m). Per passare da reale a gioco: `posizione_reale * Config.S`.
+- **Assi** (come la planimetria vista dall'alto): `-Z` = parete con le 3 finestre, `+Z` = parete con la porta,
+  `-X` = sinistra (ovest), `+X` = destra (est), `y = 0` pavimento. I personaggi guardano verso `-Z`.
+- **In kit.gd**: `pos` = centro della **base** dell'oggetto; `look` = `Color` oppure `Material`;
+  `collide=false` per i dettagli piccoli (tasti, penne, cavi) che non devono bloccare.
+  Per mobili ruotati: `var o := xf(origine, gradi)` e poi `lbox(o, ...)` / `lcyl(o, ...)` in coordinate locali.
+- **Collisioni**: livelli in `config.gd` (`LAYER_WORLD=1`, `LAYER_PLAYER=2`, `LAYER_ENEMY=4`).
+  Gli slime camminano solo dove la mesh di navigazione lo permette: pendenza ≤ 40°,
+  gradini ≤ 0,5 m di gioco. Il giocatore sale da solo i gradini ≤ 0,6 m di gioco (circa 3 cm reali).
+- **Script**: non usare `class_name`. Ogni file si richiama con
+  `const Nome := preload("res://scripts/...")`, e quella costante si può usare anche come tipo.
+- **GDScript tipizzato**: `var x := qualcosa` dà errore se `qualcosa` è un Variant (elementi di Array o
+  Dictionary, risultati di oggetti non tipizzati). In quei casi scrivi il tipo: `var c: Color = LISTA[i]`.
+- I file `.uid` accanto agli script li crea Godot. Se sposti uno script, cancella il suo `.uid`.
+  Se Godot fa cose strane dopo uno spostamento, cancella la cartella `StanzaFPS/.godot/` (è solo cache).
+
+## Dove cambiare cosa
+
+| Voglio… | File | Come |
+|---|---|---|
+| Cambiare vita, velocità, salto (uguali per tutti) | `config.gd` | sezione "giocatore" (`PLAYER_HP`, ...) |
+| Cambiare danno, cadenza, caricatore di un'arma | `data/weapons.gd` | modifica i valori (sono spiegati in cima al file) |
+| Aggiungere un'arma | `data/weapons.gd` + `actors/gun_models.gd` | copia un blocco `{...}` e fai il modello; il menu crea il pulsante da solo (in partita tasti 1–4, rotellina, Q) |
+| Aggiungere un personaggio | `data/characters.gd` | copia un blocco `{...}`: il menu crea la scheda da solo (tasti 1–9) |
+| Aggiungere una persona vera con le foto | `tools/foto_personaggi.py` + `data/looks.gd` + `data/characters.gd` | foto in `persongg/<nome>/`, rettangoli di ritaglio in `CROPS`, `python tools/foto_personaggi.py --prova`; poi copia un blocco di LOOKS (forme ad anelli) e metti `"look": "nome"` nel personaggio |
+| Correggere un ritaglio di foto (faccia storta, sfondo che si vede) | `tools/foto_personaggi.py` | cambia il rettangolo in `CROPS`, rilancia lo script, poi `bash tools/primo_piano.sh` e guarda `tools/shots/primi_piani.png` |
+| Modello Blender di una persona vera | `tools/blender_persona.py` | `blender.exe -b --factory-startup --python tools/blender_persona.py -- --look=matteo --render`; ritocchi in `blender/<look>.blend`, poi esporta glTF in `modelli/<look>.glb` (pezzi `GambaSX GambaDX Busto Testa Braccia`). Per tornare al modello da codice cancella il `.glb`. Testa realistica: punti della faccia (occhi, naso, bocca, sagoma) in `FIT` di `tools/blender_testa.py`; chi non è in `FIT` usa la vecchia testa a uovo. Primo piano: aggiungi `--testa` → `blender/<look>_primo_piano.png` |
+| Versione Minecraft (a cubi) di una persona vera | `data/looks_minecraft.gd` | disegni a quadratini e blocchi; nel menu il pulsante ASPETTO (tasto T) sceglie BLENDER o MINECRAFT; da riga di comando `--minecraft` |
+| Nuovo copricapo | `actors/character_model.gd` | nuovo caso nel `match` di `"hat"` in `setup()` |
+| Nuova arma (aspetto) | `actors/gun_models.gd` | nuovo caso nel `match kind`; lascia il nodo `Muzzle`; `red_dot = false` per gli oggetti d'ufficio (niente mirino) |
+| Cambiare difficoltà, numero di slime, boss | `config.gd` | sezioni "ondate" e "slime" |
+| Velocità base, salto, telecamera, FOV | `config.gd` | sezioni "giocatore" e "telecamere" |
+| Super salto (B), corsa, scivolata, a terra (Z), visuale frontale (V) | `config.gd` + `actors/player.gd` | numeri in config (`PLAYER_SUPER_JUMP` è un'altezza: il sedile delle sedie è a ~9 m di gioco); logica in `_physics_process`; pose sdraiato/scivolata in `animate()` di `character_model.gd`; telecamera frontale in `follow_camera.gd` (`front`) |
+| Spostare o aggiungere un mobile/oggetto | `world/room.gd` | nella sezione giusta (indice in cima al file) |
+| Spostare monitor, tastiere o sedie delle postazioni | `world/room.gd` | tabella `STATIONS` |
+| Cambiare le misure della stanza | `world/room.gd` | costanti `W D H T`, bordi isola `IX0..IZ1`, porta `DOOR_X0/X1` |
+| Dove compaiono giocatore e slime | `world/room.gd` | `PLAYER_SPAWN`, `ENEMY_SPAWNS` |
+| Luci della stanza | `world/room.gd` | `_ceiling_and_lights()` (funzione `omni`) |
+| Luce generale / atmosfera | `world/world_setup.gd` | `add_environment()` |
+| Nuova texture (es. poster) | `world/textures.gd` | nuova funzione statica, poi in room.gd `quad(..., lit(Textures.nome()))` |
+| Comportamento degli slime | `actors/slime.gd` | movimento in `_physics_process`, colpi in `take_hit` |
+| Multiplayer (ospita / unisciti, stessa rete) | `game/rete.gd`, `actors/avatar.gd`, `ui/menu.gd` | porta `PORT` (7777) e giocatori max in rete.gd; danno tra giocatori e rientro in `config.gd` (sezione multiplayer); pannello MULTIPLAYER in alto a destra del menu. La prima volta Windows chiede di consentire Godot sulla rete: rispondere Sì (reti private) |
+| Munizioni a terra (graffette) | `config.gd` + `world/room.gd` | sezione "munizioni" (ogni quanto, quante, caricatori) e `PICKUP_SPOTS`; modello in `game/munizioni.gd` |
+| Colpi colorati di un'arma | `data/weapons.gd` | campi `tracer` (colpo che vola) e `splat` (macchia sul muro) |
+| Colpi in testa | `config.gd` | `HEADSHOT_MULT`; zona della testa in `actors/avatar.gd` (`take_hit`) |
+| Tasti | `game/input_setup.gd` | dizionari `KEYS` e `MOUSE` |
+| Testi e grafica di HUD e menu | `ui/hud.gd`, `ui/menu.gd` | |
+| Posizione degli omini e della telecamera nel menu | `ui/menu_stage.gd` | costanti in cima (metri reali) |
+
+**Se cambi la stanza**, controlla anche: `ENEMY_SPAWNS` e `PLAYER_SPAWN` (non dentro i mobili),
+le costanti di `ui/menu_stage.gd` (vetrina del menu), le pose di test in `main.gd` (`_apply_pose`)
+e i punti del percorso in `tools/test_enemies.gd`. La **rampa** (`_ramp`) serve per salire sulle scrivanie:
+se la togli, servono un'altra salita o un ponte.
+
+### Esempio: aggiungere un oggetto alla stanza
+
+```gdscript
+# in world/room.gd, dentro la sezione adatta (es. _desk_clutter):
+cyl(0.04, 0.1, Vector3(0.3, T, -0.7), mat(Color(0.9, 0.1, 0.1), 0.4))        # tazza rossa sull'isola
+box(Vector3(0.3, 0.02, 0.2), Vector3(-1.2, 0, 0.3), Color(0.2, 0.2, 0.8), true, 30.0)  # libro sul pavimento ruotato di 30°
+```
+
+## Verificare dopo ogni modifica
+
+Da Git Bash, nella cartella `StanzaFPS`:
+
+```bash
+bash tools/check.sh            # import, menu, 3 personaggi, prima persona, test nemici → "TUTTO OK"
+bash tools/check.sh --shots    # in più salva screenshot in tools/shots/ (apre una finestra per pochi secondi)
+```
+
+Gli screenshot (`menu.png`, `stanza_dall_alto.png`, `terza_persona.png`, `prima_persona_scrivania.png`, `ritratti.png`, `armi.png`)
+vanno **guardati** dopo modifiche grafiche o alla stanza.
+
+Opzioni da riga di comando del gioco, utili per provare (`Godot..._console.exe --path . -- <opzioni>`):
+`--autostart` (salta il menu), `--char=N`, `--weapon=N` (arma di partenza), `--fp` (prima persona), `--shot=percorso.png` (screenshot dopo 90 frame ed esce),
+`--minecraft` (persone vere a cubi), `--host` / `--join=IP` / `--name=NOME` (multiplayer), `--shotframe=N` (screenshot al fotogramma N), `--overview` / `--desk` / `--door` (posizioni della telecamera o del giocatore), `--front` (visuale frontale), `--prone` (sdraiato).

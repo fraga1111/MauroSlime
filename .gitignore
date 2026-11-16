@@ -1,0 +1,5 @@
+Godot/
+StanzaFPS/.godot/
+*.blend1
+StanzaFPS/tools/shots/
+*.tmp

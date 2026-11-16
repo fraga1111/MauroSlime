@@ -1,0 +1,57 @@
+NEMICI MESSI DA PARTE (non fanno più parte del gioco)
+=====================================================
+
+Il gioco ora è una bozza per il multigiocatore online: slime e ondate sono stati tolti.
+Questa cartella contiene il vecchio codice, così si può riprendere quando serviranno di nuovo.
+Godot la ignora del tutto (c'è il file .gdignore): niente di ciò che sta qui viene caricato.
+
+File
+----
+  slime.gd         il nemico                      (stava in scripts/actors/)
+  waves.gd         ondate, comparsa, punteggio    (stava in scripts/game/)
+  test_enemies.gd  test automatico dei nemici     (stava in tools/)
+
+Per rimetterli
+--------------
+1. Riporta i file nelle cartelle di prima.
+2. Rimetti in scripts/config.gd le costanti qui sotto.
+3. In scripts/main.gd: crea la stanza dentro un NavigationRegion3D e chiama
+   WorldSetup.bake_navigation(nav) (la funzione è ancora in world/world_setup.gd),
+   poi crea Waves, collega i segnali wave_started / wave_cleared / score_changed.
+4. In scripts/ui/hud.gd rimetti le etichette di ondata e punteggio (set_wave, set_score).
+5. I punti di comparsa ENEMY_SPAWNS sono rimasti in world/room.gd.
+6. slime.gd chiama player.take_damage(...) e si aspetta take_hit(danno, punto, direzione): il
+   giocatore ha ancora entrambe le cose (il segnale del colpo a segno ora si chiama hit_target).
+
+Costanti tolte da config.gd
+---------------------------
+# --- ondate ------------------------------------------------------------------
+const FIRST_WAVE_DELAY := 2.0
+const NEXT_WAVE_DELAY := 4.0
+const SPAWN_INTERVAL := 0.7       # secondi tra uno slime e il successivo
+const WAVE_BASE_COUNT := 3        # slime nell'ondata = BASE + ondata * PER_WAVE
+const WAVE_COUNT_PER_WAVE := 2
+const BOSS_EVERY := 5             # un Re Slime ogni N ondate
+const DESK_SPAWNS_FROM_WAVE := 3  # da quale ondata compaiono slime sopra le scrivanie
+const MIN_SPAWN_DISTANCE := 18.0  # distanza minima dal giocatore (metri di gioco)
+const WAVE_CLEAR_HEAL := 30.0
+const WAVE_CLEAR_AMMO := 120
+
+# --- slime -------------------------------------------------------------------
+const SLIME_HP := 2               # + 1 ogni 2 ondate
+const SLIME_SPEED := 4.8
+const SLIME_SPEED_PER_WAVE := 0.35
+const SLIME_MAX_SPEED := 9.5
+const SLIME_DAMAGE := 8.0
+const SLIME_DAMAGE_PER_WAVE := 1.0
+const SLIME_HIT_COOLDOWN := 0.9
+const SLIME_BLUE_CHANCE := 0.25   # solo estetica
+const SLIME_GREEN := Color(0.3, 0.95, 0.35)
+const SLIME_BLUE := Color(0.35, 0.7, 1.0)
+
+const BOSS_SIZE := 2.2
+const BOSS_HP := 20               # + BOSS_HP_PER_WAVE * ondata
+const BOSS_HP_PER_WAVE := 3
+const BOSS_SPEED := 3.5
+const BOSS_DAMAGE := 25.0
+const BOSS_COLOR := Color(0.95, 0.35, 0.9)
