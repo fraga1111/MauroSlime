@@ -5,6 +5,7 @@ Sparatutto in prima/terza persona fatto in **Godot 4.7.2 + GDScript**. Il giocat
 **Tutto è generato da codice**: niente modelli 3D o scene da editor (c'è solo `main.tscn`, vuota).
 Eccezioni: le texture delle persone vere (Matteo, Broski) sono ritagli delle loro foto (`StanzaFPS/textures/persone/`),
 e una persona vera può avere un modello fatto in Blender (`StanzaFPS/modelli/<look>.glb`): se c'è, il gioco usa quello.
+ANTONINO e MARIPA sono scansioni 3D fatte col telefono (app KIRI, `persongg/<nome>/`), adattate da `tools/blender_scan.py`.
 
 Questa guida serve a chiunque modifichi il gioco (persone o IA). Lingua del progetto: **italiano**
 (commenti, testi a schermo, nomi dei file di dati).
@@ -38,6 +39,9 @@ MauroSlime/
    │  ├─ actors/gun_models.gd   modelli delle armi (oggetti d'ufficio, ricostruiti dalle foto)
    │  ├─ actors/slime.gd        nemico
    │  ├─ actors/avatar.gd       omino di un ALTRO giocatore in multiplayer (mosso dalla rete)
+   │  ├─ actors/veicolo.gd      base dei veicoli: salire/scendere (E), posto a sedere, telecamera
+   │  ├─ actors/macchinina.gd   Opel Agila bianca in scala 1:18, si guida (anche su per la rampa)
+   │  ├─ actors/aeroplanino.gd  aeroplanino di carta a quadretti, si pilota in volo
    │  ├─ game/waves.gd          ondate, comparsa slime, punteggio
    │  ├─ game/input_setup.gd    tasti
    │  ├─ game/rete.gd           MULTIPLAYER in rete locale: ospita / unisciti, faro per trovare le partite, versione
@@ -53,10 +57,12 @@ MauroSlime/
       ├─ check.sh               controllo completo (vedi "Verificare")
       ├─ test_enemies.gd        test automatico dei nemici
       ├─ test_moves.gd          test di corsa, scivolata, a terra, visuale frontale, super salto (sedia)
+      ├─ test_veicoli.gd        test di macchinina (gas, sterzo, rampa, scendere) e aeroplanino (decollo)
       ├─ ritratti.gd            screenshot di tutti i personaggi (davanti, 3/4, fianco, dietro)
       ├─ armi.gd                primo piano di tutte le armi (fianco, alto, dietro)
       ├─ graffette.gd           primo piano della scatola di graffette e delle macchie fluo
       ├─ blender_persona.py     crea in Blender una persona di looks.gd (.blend + modelli/<look>.glb)
+      ├─ blender_scan.py        scansione 3D del telefono (.obj) -> persona del gioco (modelli/<look>.glb), gambe e scarpe inventate
       ├─ blender_testa.py       testa anatomica (naso, orbite, labbra, mento, orecchie) misurata sulla foto frontale
       ├─ foto_personaggi.py     ritaglia le foto di persongg/ in textures/persone/ (Python + Pillow + numpy)
       ├─ primo_piano.sh         primi piani di Matteo e Broski -> tools/shots/primi_piani.png
@@ -94,9 +100,14 @@ MauroSlime/
 | Aggiungere una persona vera con le foto | `tools/foto_personaggi.py` + `data/looks.gd` + `data/characters.gd` | foto in `persongg/<nome>/`, rettangoli di ritaglio in `CROPS`, `python tools/foto_personaggi.py --prova`; poi copia un blocco di LOOKS (forme ad anelli) e metti `"look": "nome"` nel personaggio |
 | Correggere un ritaglio di foto (faccia storta, sfondo che si vede) | `tools/foto_personaggi.py` | cambia il rettangolo in `CROPS`, rilancia lo script, poi `bash tools/primo_piano.sh` e guarda `tools/shots/primi_piani.png` |
 | Modello Blender di una persona vera | `tools/blender_persona.py` | `blender.exe -b --factory-startup --python tools/blender_persona.py -- --look=matteo --render`; ritocchi in `blender/<look>.blend`, poi esporta glTF in `modelli/<look>.glb` (pezzi `GambaSX GambaDX Busto Testa Braccia`). Per tornare al modello da codice cancella il `.glb`. Testa realistica: punti della faccia (occhi, naso, bocca, sagoma) in `FIT` di `tools/blender_testa.py`; chi non è in `FIT` usa la vecchia testa a uovo. Primo piano: aggiungi `--testa` → `blender/<look>_primo_piano.png` |
+| Persona da SCANSIONE 3D del telefono (es. Antonino, app KIRI: .obj + .jpg) | `tools/blender_scan.py` | `blender.exe -b --factory-startup --python tools/blender_scan.py -- --look=antonino --render --testa`; misure in `SCANS` (raddrizzare, collo, braccia, scala, gambe/scarpe inventate, triangoli e texture). `--punti` colora i pezzi per controllare i tagli, `--busto` primo piano di busto e braccia. Vestiti larghi con le maniche fuse al busto (Maripa): `code_arms` fa le braccia da codice e `side_trim` toglie i lembi rimasti. Le zone non viste dal telefono diventano materiali a tinta unita (maglia, pantaloni, pelle). Poi `"look": "nome"` nel personaggio (senza voce in looks.gd). Texture esportata in WebP: Godot non legge i JPEG scritti da Blender 5.3 |
 | Versione Minecraft (a cubi) di una persona vera | `data/looks_minecraft.gd` | disegni a quadratini e blocchi; nel menu il pulsante ASPETTO (tasto T) sceglie BLENDER o MINECRAFT; da riga di comando `--minecraft` |
 | Nuovo copricapo | `actors/character_model.gd` | nuovo caso nel `match` di `"hat"` in `setup()` |
 | Nuova arma (aspetto) | `actors/gun_models.gd` | nuovo caso nel `match kind`; lascia il nodo `Muzzle`; `red_dot = false` per gli oggetti d'ufficio (niente mirino) |
+| Ingrandire un'arma in mano (spillatrice e telefono sono al doppio) | `actors/gun_models.gd` | nel caso dell'arma `size = 2.0` e `back_z` = z del fondo (resta fermo, l'arma cresce in avanti) |
+| Macchinina / aeroplanino: velocità, sterzo, volo | `config.gd` | sezioni "veicoli", "macchinina", "aeroplanino" |
+| Macchinina / aeroplanino: aspetto, comandi, posto a sedere | `actors/macchinina.gd`, `actors/aeroplanino.gd` | `_build()` per il modello, `_physics_process` per la guida; dove stanno: `CAR_SPOT` / `PLANE_SPOT` in `world/room.gd`; salire/scendere in `actors/player.gd` (`enter_vehicle`, `exit_vehicle`) |
+| Nuovo veicolo | `actors/veicolo.gd` | nuovo file con `extends "res://scripts/actors/veicolo.gd"` (come macchinina.gd), poi crealo in `_spawn_vehicles()` di `main.gd` |
 | Cambiare difficoltà, numero di slime, boss | `config.gd` | sezioni "ondate" e "slime" |
 | Velocità base, salto, telecamera, FOV | `config.gd` | sezioni "giocatore" e "telecamere" |
 | Super salto (B), corsa, scivolata, a terra (Z), visuale frontale (V) | `config.gd` + `actors/player.gd` | numeri in config (`PLAYER_SUPER_JUMP` è un'altezza: il sedile delle sedie è a ~9 m di gioco); logica in `_physics_process`; pose sdraiato/scivolata in `animate()` di `character_model.gd`; telecamera frontale in `follow_camera.gd` (`front`) |
@@ -116,7 +127,7 @@ MauroSlime/
 | Testi e grafica di HUD e menu | `ui/hud.gd`, `ui/menu.gd` | |
 | Posizione degli omini e della telecamera nel menu | `ui/menu_stage.gd` | costanti in cima (metri reali) |
 
-**Se cambi la stanza**, controlla anche: `ENEMY_SPAWNS` e `PLAYER_SPAWN` (non dentro i mobili),
+**Se cambi la stanza**, controlla anche: `ENEMY_SPAWNS`, `PLAYER_SPAWN`, `CAR_SPOT` e `PLANE_SPOT` (non dentro i mobili),
 le costanti di `ui/menu_stage.gd` (vetrina del menu), le pose di test in `main.gd` (`_apply_pose`)
 e i punti del percorso in `tools/test_enemies.gd`. La **rampa** (`_ramp`) serve per salire sulle scrivanie:
 se la togli, servono un'altra salita o un ponte.
@@ -129,18 +140,27 @@ cyl(0.04, 0.1, Vector3(0.3, T, -0.7), mat(Color(0.9, 0.1, 0.1), 0.4))        # t
 box(Vector3(0.3, 0.02, 0.2), Vector3(-1.2, 0, 0.3), Color(0.2, 0.2, 0.8), true, 30.0)  # libro sul pavimento ruotato di 30°
 ```
 
-## Verificare dopo ogni modifica
+## Lavorare veloce (regole per l'IA)
+
+- **Leggi solo il ramo che serve**: usa la tabella "Dove cambiare cosa" e i comandi su misura
+  (`/personaggio`, `/scansione`, `/arma`, `/stanza`, `/bilancia`, in `.claude/skills/`). Nei file grossi
+  (player.gd, character_model.gd, room.gd, blender_scan.py) trova la funzione con Grep e leggi solo quelle righe.
+- **Prima tutte le modifiche, poi i controlli UNA volta sola alla fine** con `/prova`, che sceglie il controllo
+  più leggero e solo gli screenshot che servono. Non lanciare check.sh dopo ogni singola modifica.
+
+## Verificare (alla fine del lavoro)
 
 Da Git Bash, nella cartella `StanzaFPS`:
 
 ```bash
-bash tools/check.sh            # import, menu, 3 personaggi, prima persona, test nemici → "TUTTO OK"
-bash tools/check.sh --shots    # in più salva screenshot in tools/shots/ (apre una finestra per pochi secondi)
+bash tools/check.sh                       # completo: import, menu, tutti i personaggi, test rampa/telecamera/mosse/veicoli → "TUTTO OK"
+bash tools/check.sh --rapido --char=N     # veloce: import, menu e UNA partita (per modifiche piccole)
+bash tools/check.sh --solo=ritratti,menu  # solo gli screenshot nominati (nomi in cima a check.sh)
+bash tools/check.sh --shots               # completo + tutti gli screenshot in tools/shots/ (prima di un commit)
 ```
 
-Gli screenshot (`menu.png`, `stanza_dall_alto.png`, `terza_persona.png`, `prima_persona_scrivania.png`, `ritratti.png`, `armi.png`)
-vanno **guardati** dopo modifiche grafiche o alla stanza.
+Gli screenshot vanno **guardati** dopo modifiche grafiche o alla stanza (quali: vedi `/prova`).
 
 Opzioni da riga di comando del gioco, utili per provare (`Godot..._console.exe --path . -- <opzioni>`):
 `--autostart` (salta il menu), `--char=N`, `--weapon=N` (arma di partenza), `--fp` (prima persona), `--shot=percorso.png` (screenshot dopo 90 frame ed esce),
-`--minecraft` (persone vere a cubi), `--host` / `--join=IP` / `--name=NOME` (multiplayer), `--shotframe=N` (screenshot al fotogramma N), `--overview` / `--desk` / `--door` (posizioni della telecamera o del giocatore), `--front` (visuale frontale), `--prone` (sdraiato).
+`--minecraft` (persone vere a cubi), `--host` / `--join=IP` / `--name=NOME` (multiplayer), `--shotframe=N` (screenshot al fotogramma N), `--overview` / `--desk` / `--door` / `--garage` (posizioni della telecamera o del giocatore), `--front` (visuale frontale), `--prone` (sdraiato), `--guida` (seduto in macchinina), `--vola` (sull'aeroplanino in volo).

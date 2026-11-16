@@ -2,7 +2,7 @@ extends Node3D
 ## Omino alto circa 1,8 m in scala gioco (cioè 10 cm reali), con animazioni semplici:
 ## camminata, salto, accovacciamento, mira su/giù, rinculo e ricarica.
 ## Guarda verso -Z come il giocatore.
-## Tipi: soldatino a blocchi (MAURO, ANTONINO, JESN) e persona vera (MATTEO, BROSKI) in due stili:
+## Tipi: soldatino a blocchi (MAURO, JESN) e persona vera (MATTEO, BROSKI, ANTONINO) in due stili:
 ## "blender" (modelli/<look>.glb, o forme arrotondate con le foto di data/looks.gd) e "minecraft"
 ## (cubi e quadratini, data/looks_minecraft.gd). Lo stile lo sceglie il menu (chiave "stile").
 
@@ -26,6 +26,12 @@ var _crouch := 0.0
 var _gun_base := Vector3(0.12, -0.1, -0.4)
 var _fade := 0.0
 var _meshes: Array[MeshInstance3D] = []
+## Seduto (in macchinina o sull'aeroplanino, actors/veicolo.gd): gambe in avanti, arma nascosta.
+var seated := false:
+	set(value):
+		seated = value
+		if _gun:
+			_gun.visible = not value
 
 
 func setup(d: Dictionary) -> void:
@@ -54,6 +60,7 @@ func set_gun(kind: String) -> void:
 	_gun.position = _gun_base
 	_arms.add_child(_gun)
 	muzzle = _gun.get_node("Muzzle")
+	_gun.visible = not seated
 	_meshes.clear()                      # set_fade deve ritrovare anche le mesh della nuova arma
 	if _fade > 0.0:
 		var a := _fade
@@ -61,7 +68,7 @@ func set_gun(kind: String) -> void:
 		set_fade(a)
 
 
-## Soldatino a blocchi grandi (MAURO, ANTONINO, JESN): colori da data/characters.gd.
+## Soldatino a blocchi grandi (MAURO, JESN): colori da data/characters.gd.
 func _build_soldier(d: Dictionary) -> void:
 	var skin := _mat(d.get("skin", Color(0.94, 0.76, 0.6)), 0.7)
 	var uniform := _mat(d.get("uniform", Color(0.3, 0.4, 0.25)), 0.9)
@@ -131,7 +138,8 @@ func _build_soldier(d: Dictionary) -> void:
 	_box(_arms, Vector3(0.1, 0.1, 0.1), Vector3(0.07, -0.13, -0.62), skin)
 
 
-## Persona vera fatta in BLENDER (modelli/<look>.glb, creato da tools/blender_persona.py e ritoccabile
+## Persona vera fatta in BLENDER (modelli/<look>.glb, creato da tools/blender_persona.py o, per le
+## scansioni 3D del telefono, da tools/blender_scan.py; ritoccabile
 ## in blender/<look>.blend). Se il file c'è, si usa al posto di _build_person. I pezzi devono chiamarsi
 ## GambaSX, GambaDX, Busto, Testa, Braccia, con i perni dove li mette _build_person (anche, collo, spalle).
 func _load_model(path: String) -> void:
@@ -343,6 +351,9 @@ func animate(delta: float, hspeed: float, crouch: bool, pitch: float, on_floor: 
 		r = -0.35
 	l += _crouch * 1.2
 	r += _crouch * 0.9
+	if seated:
+		l = 1.45                                      # seduto: gambe dritte in avanti
+		r = 1.45
 	var t := clampf(delta * 15.0, 0.0, 1.0)
 	_leg_l.rotation.x = lerpf(_leg_l.rotation.x, l, t)
 	_leg_r.rotation.x = lerpf(_leg_r.rotation.x, r, t)

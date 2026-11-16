@@ -19,6 +19,8 @@ const KEYS := {
 	"weapon_2": [KEY_2, KEY_KP_2],    # spillatrice
 	"weapon_3": [KEY_3, KEY_KP_3],    # telefono
 	"weapon_4": [KEY_4, KEY_KP_4],    # spillatrice a pinza
+	"interact": [KEY_E],              # sali / scendi dalla macchinina o dall'aeroplanino (actors/veicolo.gd)
+	"lights": [KEY_L],                # fari della macchinina
 }
 
 ## Più tasti del mouse per la stessa azione: lista di pulsanti

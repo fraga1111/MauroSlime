@@ -13,6 +13,8 @@ static func build(kind: String) -> Node3D:
 	var muzzle_z := -0.68
 	var muzzle_y := 0.01
 	var red_dot := true
+	var size := 1.0          # grandezza in mano (2 = il doppio)
+	var back_z := 0.0        # z del fondo dell'arma: ingrandendo resta fermo lì
 	match kind:
 		"evidenziatore":
 			# evidenziatore giallo fluo (foto): corpo ovale, tappo arrotondato davanti con anello a
@@ -73,6 +75,8 @@ static func build(kind: String) -> Node3D:
 			muzzle_z = -0.28
 			muzzle_y = -0.055
 			red_dot = false
+			size = 2.0                                  # il doppio di una spillatrice vera in scala
+			back_z = 0.22
 		"telefono":
 			# cordless nero (foto): tastiera verso l'alto, l'auricolare davanti; lungo 0,5
 			var body := _mat(Color(0.05, 0.05, 0.06), 0.35, 0.1)
@@ -119,6 +123,8 @@ static func build(kind: String) -> Node3D:
 			muzzle_z = -0.32
 			muzzle_y = 0.0
 			red_dot = false
+			size = 2.0                                  # il doppio di un cordless vero in scala
+			back_z = 0.18
 		"pinza":
 			# spillatrice a pinza: muso davanti, due bracci curvi che si aprono a V verso il fondo.
 			# Sopra: braccio cromato bombato con il caricatore (striscia di punti dentro) e il muso;
@@ -222,6 +228,18 @@ static func build(kind: String) -> Node3D:
 
 	if red_dot:
 		_red_dot(g, metal)
+
+	if size != 1.0:
+		# ingrandita: il fondo resta dov'era (contro il petto) e l'arma cresce in avanti
+		var big := Node3D.new()
+		for c in g.get_children():
+			g.remove_child(c)
+			big.add_child(c)
+		big.scale = Vector3.ONE * size
+		big.position.z = back_z * (1.0 - size)
+		g.add_child(big)
+		muzzle_y *= size
+		muzzle_z = back_z + (muzzle_z - back_z) * size
 
 	var muzzle := Node3D.new()
 	muzzle.name = "Muzzle"

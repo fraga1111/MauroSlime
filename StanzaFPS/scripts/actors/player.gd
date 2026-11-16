@@ -3,8 +3,9 @@ extends CharacterBody3D
 ## Comandi (tasti in game/input_setup.gd): WASD, Shift o tasto laterale del mouse corri, Spazio salta,
 ## B super salto, Ctrl/C accovacciati (premuto mentre corri = scivolata), Z a terra a strisciare,
 ## V visuale frontale, click sinistro spara, click destro mira, R ricarica, Esc libera il mouse,
-## 1-4 · rotellina · Q cambia arma.
+## 1-4 · rotellina · Q cambia arma, E sali/scendi dalla macchinina o dall'aeroplanino (actors/veicolo.gd).
 ## Tutti i personaggi hanno le stesse abilità (config.gd) e le stesse armi (data/weapons.gd).
+## Sul veicolo l'omino diventa figlio del veicolo, seduto; guida il veicolo (i comandi li legge lui).
 ##
 ## La telecamera è in actors/follow_camera.gd (segue l'omino ed evita muri e oggetti).
 ## Qui si decide solo dove guarda (_yaw, _pitch); il corpo viene girato nei passi della fisica.
@@ -17,8 +18,12 @@ signal front_view_changed(front: bool)
 signal weapon_changed(weapon_name: String)
 ## Ha sparato (per il multiplayer): dove è arrivato il colpo e se ha preso la stanza
 signal fired(to: Vector3, normal: Vector3, world: bool)
+## Scritta in basso: "E sali sulla macchinina" vicino a un veicolo, i comandi mentre guidi, "" = niente
+signal vehicle_hint(text: String)
+signal driving_changed(on: bool)
 
 const Config := preload("res://scripts/config.gd")
+const Veicolo := preload("res://scripts/actors/veicolo.gd")
 const CharacterModel := preload("res://scripts/actors/character_model.gd")
 const FollowCamera := preload("res://scripts/actors/follow_camera.gd")
 const Weapons := preload("res://scripts/data/weapons.gd")
@@ -89,6 +94,10 @@ var _front_view := false
 var _spark_mat: StandardMaterial3D
 var _w_mag: Array[int] = []      # colpi nel caricatore di ogni arma (restano quando la cambi)
 var _w_reserve: Array[int] = []
+var _vehicle: Veicolo = null     # veicolo su cui sei seduto (null = a piedi)
+var _home_parent: Node           # dove torna l'omino quando scende
+var _hint := ""
+var _hint_t := 0.0
 
 
 func _ready() -> void:
@@ -100,7 +109,7 @@ func _ready() -> void:
 	_load_weapon(start_weapon)
 
 	collision_layer = Config.LAYER_PLAYER
-	collision_mask = Config.LAYER_WORLD | Config.LAYER_ENEMY
+	collision_mask = Config.LAYER_WORLD | Config.LAYER_ENEMY | Config.LAYER_VEHICLE
 	floor_snap_length = 0.7
 	floor_max_angle = deg_to_rad(Config.MAX_SLOPE_DEG)
 	floor_constant_speed = true      # stessa velocità in piano e sulla rampa
@@ -201,6 +210,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		return
+	if event.is_action_pressed("interact") and (captured or auto_test):
+		if _vehicle:
+			exit_vehicle()
+		else:
+			var v := _near_vehicle()
+			if v:
+				enter_vehicle(v)
+		return
+	if _vehicle:
+		# sul veicolo il mouse lo usa il veicolo (guardarsi intorno, o dirigere l'aeroplanino); niente armi
+		if event is InputEventMouseMotion and captured:
+			var r: Vector2 = event.relative
+			_vehicle.mouse_look(r * mouse_sensitivity)
+		return
 	if event.is_action_pressed("front_view"):
 		set_front_view(not _front_view)
 		return
@@ -248,6 +271,9 @@ func _process(_delta: float) -> void:
 # ---------------------------------------------------------------- movimento
 
 func _physics_process(delta: float) -> void:
+	if _vehicle:
+		_ride(delta)
+		return
 	rotation.y = _yaw
 	if not alive:
 		if not is_on_floor():
@@ -357,6 +383,120 @@ func _physics_process(delta: float) -> void:
 	_aim_camera()
 	var hv := Vector2(velocity.x, velocity.z).length()
 	_model.animate(delta, hv, _crouching, _pitch, is_on_floor(), _reload_t > 0.0, _prone_k)
+	_update_hint(delta)
+
+
+# ---------------------------------------------------------------- veicoli
+
+## Seduto sul veicolo: si muove insieme a lui (è suo figlio); la telecamera guarda dove dice il veicolo.
+func _ride(delta: float) -> void:
+	_rig.yaw = _vehicle.cam_yaw()
+	_rig.pitch = _vehicle.cam_pitch()
+	_model.animate(delta, 0.0, false, -0.25, true, false, 0.0)
+
+
+## Il veicolo libero più vicino entro Config.ENTER_DISTANCE (null se non ce n'è).
+func _near_vehicle() -> Veicolo:
+	var best: Veicolo = null
+	var best_d := Config.ENTER_DISTANCE
+	for n in get_tree().get_nodes_in_group("veicoli"):
+		var v := n as Veicolo
+		if v == null or v.driver != null:
+			continue
+		var d := global_position.distance_to(v.global_position)
+		if d < best_d:
+			best_d = d
+			best = v
+	return best
+
+
+## Sale sul veicolo v: si siede al suo posto e da lì in poi i tasti guidano il veicolo.
+func enter_vehicle(v: Veicolo) -> void:
+	if _vehicle or not alive or v.driver != null:
+		return
+	_vehicle = v
+	_home_parent = get_parent()
+	set_front_view(false)
+	_prone = false
+	_prone_k = 0.0
+	_slide_t = 0.0
+	_slide_k = 0.0
+	_reload_t = 0.0
+	aiming = false
+	_height = STAND_HEIGHT
+	_update_shape()
+	_col.disabled = true
+	velocity = Vector3.ZERO
+	reparent(v, false)
+	transform = v.seat_local(0.85 * _model.scale.y)
+	_model.position = Vector3.ZERO
+	_model.rotation = Vector3.ZERO
+	_model.seated = true
+	reset_physics_interpolation()
+	v.driver = self
+	v.got_in()
+	_rig.yaw = v.cam_yaw()
+	_rig.pitch = v.cam_pitch()
+	_rig.follow(v, v.cam_reach, v.cam_height)
+	_set_hint(v.aiuto)
+	driving_changed.emit(true)
+
+
+## Scende: accanto al veicolo nel primo posto libero (exit_spots del veicolo), girato come il veicolo.
+func exit_vehicle() -> void:
+	if _vehicle == null:
+		return
+	var v := _vehicle
+	var spots := v.exit_spots()
+	var spot: Vector3 = v.global_transform * spots[0]
+	for s: Vector3 in spots:
+		var p: Vector3 = v.global_transform * s
+		if _fits_at(p):
+			spot = p
+			break
+	v.driver = null
+	v.got_out()
+	_vehicle = null
+	reparent(_home_parent, false)
+	_col.disabled = false
+	_model.seated = false
+	_rig.follow(self, 0.0, _anchor_height())
+	place(spot, v.heading())
+	_pitch = 0.0
+	_set_hint("")
+	driving_changed.emit(false)
+
+
+## C'è posto per l'omino in piedi coi piedi in p? (contro stanza e veicoli)
+func _fits_at(p: Vector3) -> bool:
+	var shape := CapsuleShape3D.new()
+	shape.radius = Config.PLAYER_RADIUS
+	shape.height = STAND_HEIGHT
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = shape
+	q.collision_mask = Config.LAYER_WORLD | Config.LAYER_VEHICLE
+	q.transform = Transform3D(Basis(), p + Vector3.UP * (STAND_HEIGHT / 2.0 + 0.04))
+	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+
+func in_vehicle() -> bool:
+	return _vehicle != null
+
+
+## A piedi: vicino a un veicolo libero compare "E  sali su ..." (controllato poche volte al secondo).
+func _update_hint(delta: float) -> void:
+	_hint_t -= delta
+	if _hint_t > 0.0:
+		return
+	_hint_t = 0.15
+	var v := _near_vehicle()
+	_set_hint("E    sali %s" % v.nome if v else "")
+
+
+func _set_hint(text: String) -> void:
+	if text != _hint:
+		_hint = text
+		vehicle_hint.emit(text)
 
 
 ## Sale automaticamente i gradini bassi (tastiere, libri) senza saltare.
@@ -438,7 +578,8 @@ func _shoot() -> void:
 	var from := cam.origin
 	var chest := global_position + Vector3(0, _height * 0.8, 0)
 	from += dir * maxf(0.0, (chest - from).dot(dir))
-	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 400.0, Config.LAYER_WORLD | Config.LAYER_ENEMY, [get_rid()])
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 400.0,
+			Config.LAYER_WORLD | Config.LAYER_ENEMY | Config.LAYER_VEHICLE, [get_rid()])
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	var w: Dictionary = Weapons.LIST[weapon]
 	var end := from + dir * 400.0
@@ -451,7 +592,8 @@ func _shoot() -> void:
 			hit_target.emit(killed)
 			fired.emit(hit["position"], hit["normal"], false)
 		else:
-			_spawn_impact(hit["position"], hit["normal"])
+			# sui veicoli il segno resta attaccato alla carrozzeria (si muove con loro)
+			_spawn_impact(hit["position"], hit["normal"], c as Veicolo)
 			fired.emit(hit["position"], hit["normal"], true)
 	else:
 		fired.emit(end, Vector3.UP, false)
@@ -547,8 +689,8 @@ func _make_flash(muzzle: Node3D) -> void:
 	muzzle.add_child(_flash_light)
 
 
-func _spawn_impact(pos: Vector3, normal: Vector3) -> void:
-	Effetti.impact(get_parent(), pos, normal, Weapons.LIST[weapon].get("splat"))
+func _spawn_impact(pos: Vector3, normal: Vector3, onto: Node3D = null) -> void:
+	Effetti.impact(onto if onto else get_parent(), pos, normal, Weapons.LIST[weapon].get("splat"))
 
 	var spark := MeshInstance3D.new()
 	var sp := SphereMesh.new()
@@ -573,6 +715,7 @@ func take_damage(amount: float) -> void:
 	health_changed.emit(hp)
 	_recoil -= 0.04
 	if hp <= 0.0:
+		exit_vehicle()
 		alive = false
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		var tw := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)

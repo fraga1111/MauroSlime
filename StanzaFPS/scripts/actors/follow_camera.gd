@@ -24,6 +24,9 @@ var aiming := false
 var sprinting := false           # correndo: FOV un po' più largo
 var front := false               # visuale frontale: la telecamera gira davanti all'omino e lo guarda
 var anchor_height := 1.45        # altezza sopra i piedi del punto sicuro (centro della "testa" della capsula)
+## Guidando (macchinina, aeroplanino): distanza fissa dietro il veicolo, niente spalla; 0 = a piedi.
+## Si imposta con follow().
+var drive_reach := 0.0
 
 var camera: Camera3D
 var fade := 0.0                  # 0 = omino ben visibile, 1 = telecamera addosso all'omino
@@ -39,6 +42,7 @@ var _side_k := 1.0
 var _dist := Config.TP_DISTANCE
 var _snap := true
 var _front_k := 0.0              # 0 = dietro, 1 = davanti (gira intorno all'omino in modo morbido)
+var _drive_yaw := 0.0            # guidando: la telecamera insegue la direzione con un filo di ritardo
 
 
 func _ready() -> void:
@@ -60,6 +64,17 @@ func snap() -> void:
 	_snap = true
 
 
+## Segue t: un veicolo (reach > 0, telecamera dietro a distanza reach) oppure l'omino (reach = 0).
+## height = altezza sopra l'origine di t del punto da cui parte la telecamera (deve essere libero).
+func follow(t: CharacterBody3D, reach: float, height: float) -> void:
+	target = t
+	drive_reach = reach
+	anchor_height = height
+	_drive_yaw = yaw
+	_side_query.exclude = [t.get_rid()]
+	_back_query.exclude = [t.get_rid()]
+
+
 func _process(delta: float) -> void:
 	if target == null:
 		return
@@ -79,19 +94,28 @@ func _process(delta: float) -> void:
 	_anchor = lerpf(_anchor, anchor_height, k)
 	_front_k = move_toward(_front_k, 1.0 if front else 0.0, delta * 3.0)
 	var fk := smoothstep(0.0, 1.0, _front_k)
+	var driving := drive_reach > 0.0
 	var want_reach := Config.TP_ADS_DISTANCE if aiming else Config.TP_DISTANCE
+	if driving:
+		want_reach = drive_reach
 	_reach = lerpf(_reach, lerpf(want_reach, Config.TP_FRONT_DISTANCE, fk), k)
 	var want_fov := Config.TP_ADS_FOV if aiming else (Config.TP_SPRINT_FOV if sprinting else Config.TP_FOV)
 	camera.fov = lerpf(camera.fov, lerpf(want_fov, Config.TP_FOV, fk), 1.0 - exp(-delta * 6.0))
 	# visuale frontale: la telecamera ruota di mezzo giro intorno all'omino, senza spalla, poco dall'alto
 	var cyaw := yaw + PI * fk
 	var cpitch := lerpf(pitch, -0.18 - pitch * 0.25, fk)
+	if driving:
+		# guidando la telecamera insegue la direzione del veicolo con un filo di ritardo (niente scatti in curva)
+		_drive_yaw = yaw if k >= 1.0 else lerp_angle(_drive_yaw, yaw, 1.0 - exp(-delta * 5.0))
+		cyaw = _drive_yaw
 
 	# 1) dal punto sicuro verso la spalla (scegliendo prima quale spalla)
 	var safe := feet + Vector3(0.0, anchor_height, 0.0)
 	var right := Basis(Vector3.UP, cyaw).x
 	var lift := Vector3(0.0, _feet_y + _anchor + Config.TP_LIFT - safe.y, 0.0)
 	var reach_side := (Config.TP_ADS_SHOULDER if aiming else Config.TP_SHOULDER) * (1.0 - fk) + 0.001
+	if driving:
+		reach_side = 0.001
 	var free_right := _free_fraction(_side_query, safe, lift + right * reach_side)
 	var free_left := _free_fraction(_side_query, safe, lift - right * reach_side)
 	if _side > 0.0 and free_right < 0.7 and free_left > free_right + 0.25:

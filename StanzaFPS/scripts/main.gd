@@ -16,8 +16,12 @@ const Hud := preload("res://scripts/ui/hud.gd")
 const MenuStage := preload("res://scripts/ui/menu_stage.gd")
 const Rete := preload("res://scripts/game/rete.gd")
 const Munizioni := preload("res://scripts/game/munizioni.gd")
+const Macchinina := preload("res://scripts/actors/macchinina.gd")
+const Aeroplanino := preload("res://scripts/actors/aeroplanino.gd")
 
 var player: Player
+var macchinina: Macchinina        # Opel Agila bianca a terra (E per guidarla)
+var aeroplanino: Aeroplanino      # aeroplanino di carta (E per pilotarlo)
 var hud: Hud
 var game_over := false
 var _stage: MenuStage
@@ -27,6 +31,7 @@ var _pending := []               # client: partita da avviare quando il collegam
 
 # opzioni da riga di comando, solo per test automatici (vedi CLAUDE.md):
 #   --autostart  --char=N  --weapon=N  --minecraft  --host  --join=IP  --name=NOME  --shot=file.png  --overview | --desk | --door | --ramp | --wall | --back
+#   --guida (seduto in macchinina)  --vola (sull'aeroplanino, già in volo)
 var _shot_path := ""
 var _shot_frames := 0
 var _shot_at := 90               # --shotframe=N: fotogramma dello screenshot
@@ -141,6 +146,7 @@ func start_game(index: int, weapon := 0, stile := "") -> void:
 	var data: Dictionary = Characters.LIST[index].duplicate()
 	if stile != "":
 		data["stile"] = stile              # persone vere: "blender" o "minecraft" (scelto nel menu)
+	_spawn_vehicles()
 
 	player = Player.new()
 	player.char_data = data
@@ -167,11 +173,30 @@ func start_game(index: int, weapon := 0, stile := "") -> void:
 	player.died.connect(_on_player_died)
 	player.front_view_changed.connect(hud.set_front_view)
 	player.fired.connect(rete.on_player_fired)
+	player.vehicle_hint.connect(hud.set_hint)
+	player.driving_changed.connect(hud.set_driving)
 	rete.player = player
 	munizioni.player = player
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_apply_pose()
+
+
+## Macchinina e aeroplanino nei loro posti (world/room.gd: CAR_SPOT, PLANE_SPOT). Ognuno ha i suoi:
+## in multiplayer ogni giocatore guida i propri (gli altri vedono solo l'omino seduto).
+func _spawn_vehicles() -> void:
+	if macchinina:
+		return
+	macchinina = Macchinina.new()
+	macchinina.name = "Macchinina"
+	macchinina.position = Room.CAR_SPOT * Config.S
+	macchinina.rotation.y = deg_to_rad(Room.CAR_YAW)
+	add_child(macchinina)
+	aeroplanino = Aeroplanino.new()
+	aeroplanino.name = "Aeroplanino"
+	aeroplanino.position = Room.PLANE_SPOT * Config.S
+	aeroplanino.rotation.y = deg_to_rad(Room.PLANE_YAW)
+	add_child(aeroplanino)
 
 
 func _process(_delta: float) -> void:
@@ -233,9 +258,9 @@ func _parse_debug_args() -> void:
 			_auto_style = "minecraft"
 		elif a.begins_with("--weapon="):
 			_auto_weapon = int(a.substr(9))
-		elif a in ["--overview", "--desk", "--door", "--ramp", "--wall", "--back"]:
+		elif a in ["--overview", "--desk", "--door", "--ramp", "--wall", "--back", "--garage"]:
 			_pose = a
-		elif a in ["--front", "--prone"]:      # visuale frontale / omino sdraiato a terra
+		elif a in ["--front", "--prone", "--guida", "--vola"]:   # visuale frontale / sdraiato / veicoli
 			_extra.append(a)
 
 
@@ -245,6 +270,14 @@ func _apply_pose() -> void:
 		player.set_front_view(true)
 	if "--prone" in _extra:
 		player._prone = true
+	if "--guida" in _extra:
+		player.enter_vehicle(macchinina)
+	if "--vola" in _extra:
+		# in volo a un metro da terra sopra la rampa, verso ovest lungo il lato della porta
+		aeroplanino.global_position = Vector3(0.25, 0.95, 1.4) * Config.S
+		aeroplanino.reset_physics_interpolation()
+		aeroplanino.launch(Config.PLANE_CRUISE)
+		player.enter_vehicle(aeroplanino)
 	var west := -Room.W / 2 + 0.022      # a filo della parete ovest
 	match _pose:
 		"--overview":
@@ -264,3 +297,5 @@ func _apply_pose() -> void:
 			player.place(Vector3(west, 0.02, 1.0) * Config.S, PI)
 		"--back":       # spalle alla parete ovest
 			player.place(Vector3(west, 0.02, 1.0) * Config.S, -PI / 2)
+		"--garage":     # di fronte alla macchinina parcheggiata, per vederla da fuori
+			player.place((Room.CAR_SPOT + Vector3(0.42, 0.02, 0.42)) * Config.S, PI / 4)

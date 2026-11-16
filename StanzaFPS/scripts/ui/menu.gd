@@ -18,6 +18,7 @@ signal join_game(index: int, weapon: int, stile: String, player_name: String, ip
 const Characters := preload("res://scripts/data/characters.gd")
 const Weapons := preload("res://scripts/data/weapons.gd")
 const Rete := preload("res://scripts/game/rete.gd")
+const LooksMinecraft := preload("res://scripts/data/looks_minecraft.gd")
 
 var index := 0
 var weapon := 0
@@ -111,7 +112,7 @@ func _ready() -> void:
 	help.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	help.offset_top = -40.0
 	help.offset_bottom = -3.0
-	help.text = "WASD muovi · Shift (o tasto laterale del mouse) corri · Spazio salta · B super salto · Ctrl accovacciati, correndo scivoli · Z a terra\nClick sx spara · Click dx mira · R ricarica · 1-4, rotellina o Q cambia arma · T aspetto (Matteo, Broski) · V visuale frontale · Esc libera il mouse"
+	help.text = "WASD muovi · Shift (o tasto laterale del mouse) corri · Spazio salta · B super salto · Ctrl accovacciati, correndo scivoli · Z a terra\nClick sx spara · Click dx mira · R ricarica · 1-4, rotellina o Q cambia arma · T aspetto (Matteo, Broski) · V visuale frontale · E sali in macchinina o sull'aeroplanino · Esc libera il mouse"
 	help.modulate = Color(1, 1, 1, 0.75)
 
 	_build_net_panel(root)
@@ -341,9 +342,10 @@ func select_weapon(w: int) -> void:
 	weapon_selected.emit(w)
 
 
-## Stile del personaggio i: "blender" (default) o "minecraft"; "" per chi non è una persona vera.
+## Stile del personaggio i: "blender" (default) o "minecraft"; "" per chi non è una persona vera
+## o non ha una versione Minecraft (es. ANTONINO, che è solo la scansione 3D).
 func style_of(i: int) -> String:
-	if not Characters.LIST[i].has("look"):
+	if not Characters.LIST[i].has("look") or not LooksMinecraft.LOOKS.has(Characters.LIST[i]["look"]):
 		return ""
 	return String(stili.get(i, "blender"))
 

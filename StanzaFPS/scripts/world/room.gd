@@ -61,6 +61,13 @@ const ENEMY_SPAWNS := [
 	Vector3(-0.4, T + 0.05, -0.45),   # sopra l'isola (y > 0.5 = solo dopo qualche ondata)
 ]
 
+# veicoli (actors/macchinina.gd, actors/aeroplanino.gd): punto a terra e direzione del muso in gradi
+# (0 = verso le finestre, 90 = verso ovest, 180 = verso la porta). Li mette in partita main.gd.
+const CAR_SPOT := Vector3(-1.05, 0.0, 1.05)     # macchinina a sinistra della comparsa, muso verso la porta
+const CAR_YAW := 180.0
+const PLANE_SPOT := Vector3(-0.45, 0.0, 1.62)   # aeroplanino dietro la comparsa, pista verso ovest
+const PLANE_YAW := 90.0
+
 # scatole di graffette (game/munizioni.gd): punti liberi sul pavimento e uno sopra l'isola
 const PICKUP_SPOTS := [
 	Vector3(-1.15, 0.0, -1.6),

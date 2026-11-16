@@ -3,3 +3,6 @@ StanzaFPS/.godot/
 *.blend1
 StanzaFPS/tools/shots/
 *.tmp
+
+# impostazioni personali di Claude Code (non condividere)
+**/.claude/settings.local.json

@@ -22,11 +22,9 @@ const LIST := [
 		"accent": Color(0.35, 0.95, 0.4),
 	},
 	{
+		# scansione 3D fatta col telefono (persongg/Antonino) -> modelli/antonino.glb (tools/blender_scan.py)
 		"name": "ANTONINO",
-		"hat": "bandana", "scale": 0.95,
-		"skin": Color(0.78, 0.58, 0.44),
-		"uniform": Color(0.13, 0.13, 0.15), "uniform2": Color(0.09, 0.09, 0.1),
-		"vest": Color(0.2, 0.2, 0.23), "hat_color": Color(0.9, 0.15, 0.15),
+		"look": "antonino", "scale": 1.0,
 		"accent": Color(1.0, 0.3, 0.3),
 	},
 	{
@@ -46,5 +44,11 @@ const LIST := [
 		"name": "BROSKI",
 		"look": "broski", "scale": 1.0,
 		"accent": Color(0.45, 0.75, 1.0),
+	},
+	{
+		# scansione 3D fatta col telefono (persongg/Maripa) -> modelli/maripa.glb (tools/blender_scan.py)
+		"name": "MARIPA",
+		"look": "maripa", "scale": 0.97,
+		"accent": Color(1.0, 0.55, 0.75),
 	},
 ]

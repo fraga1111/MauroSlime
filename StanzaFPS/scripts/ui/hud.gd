@@ -12,6 +12,7 @@ var _ammo: Label
 var _weapon: Label
 var _msg: Label
 var _hitmark: Label
+var _hint: Label                 # in basso: "E sali sulla macchinina" oppure i comandi del veicolo
 var _dmg: ColorRect
 var _cross: Control
 var _bars: Array[ColorRect] = []
@@ -54,6 +55,9 @@ func _ready() -> void:
 	_weapon.modulate = Color(1, 1, 1, 0.85)
 	_msg = _label(34, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
 	_msg.offset_bottom = -220.0
+	_hint = _label(24, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_BOTTOM)
+	_hint.offset_bottom = -110.0
+	_hint.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
 	var title := _label(20, HORIZONTAL_ALIGNMENT_LEFT, VERTICAL_ALIGNMENT_TOP)
 	title.text = "MauroSlime  v0.4 · bozza · %s" % preload("res://scripts/game/rete.gd").version()
 	title.modulate = Color(1, 1, 1, 0.6)
@@ -188,6 +192,18 @@ func set_weapon(weapon_name: String) -> void:
 func set_front_view(front: bool) -> void:
 	_cross.visible = not front
 	show_message("VISUALE FRONTALE  (V per tornare dietro)" if front else "", 1.5 if front else 0.0)
+
+
+## Scritta in basso al centro (veicoli: "E sali sulla macchinina", comandi di guida). "" = niente.
+func set_hint(text: String) -> void:
+	_hint.text = text
+
+
+## In macchinina o in aeroplanino non si spara: via il mirino e le munizioni.
+func set_driving(on: bool) -> void:
+	_cross.visible = not on
+	_ammo.visible = not on
+	_weapon.visible = not on
 
 
 func show_message(text: String, duration := 0.0) -> void:

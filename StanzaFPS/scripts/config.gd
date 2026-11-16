@@ -11,6 +11,7 @@ const S := 18.0
 const LAYER_WORLD := 1      # stanza e mobili
 const LAYER_PLAYER := 2
 const LAYER_ENEMY := 4      # nemici; in multiplayer anche gli omini degli altri giocatori (actors/avatar.gd)
+const LAYER_VEHICLE := 8    # macchinina e aeroplanino (actors/veicolo.gd): ci si sbatte contro, i colpi passano
 
 # --- giocatore (uguale per tutti i personaggi) ---------------------------------
 const PLAYER_HP := 100.0
@@ -39,6 +40,27 @@ const PICKUP_FIRST := 8.0         # secondi prima della prima scatola
 const PICKUP_INTERVAL := 15.0     # poi ne compare una ogni tanti secondi...
 const PICKUP_MAX := 3             # ...finché a terra ce ne sono al massimo tante
 const PICKUP_CLIPS := 1           # caricatori in più per OGNI arma quando ne prendi una
+
+# --- veicoli (actors/veicolo.gd): E per salire e scendere -----------------------------
+const ENTER_DISTANCE := 4.5       # quanto vicino devi essere per salire (metri di gioco, dal centro)
+
+# --- macchinina (actors/macchinina.gd), metri di gioco al secondo ------------------
+const CAR_MAX_SPEED := 18.0       # col gas (W)
+const CAR_TURBO_SPEED := 27.0     # col gas + Shift
+const CAR_REVERSE := 7.0          # in retromarcia (S da fermo)
+const CAR_ACCEL := 12.0           # quanto in fretta prende velocità
+const CAR_BRAKE := 30.0           # quanto frena (S mentre vai avanti)
+const CAR_DRAG := 4.0             # senza gas rallenta da sola così
+const CAR_STEER := 0.6            # sterzata massima delle ruote (radianti; ad alta velocità meno)
+const CAR_CAM_DISTANCE := 8.0     # telecamera dietro la macchinina
+
+# --- aeroplanino di carta (actors/aeroplanino.gd) ------------------------------------
+const PLANE_MAX_SPEED := 26.0     # con W tenuto
+const PLANE_CRUISE := 15.0        # in volo senza toccare niente
+const PLANE_MIN_FLY := 8.0        # sotto questa velocità non regge e scende (e da terra non decolla)
+const PLANE_ACCEL := 9.0
+const PLANE_TURN := 1.6           # quanto in fretta gira verso dove punti (radianti al secondo)
+const PLANE_CAM_DISTANCE := 9.0   # telecamera dietro l'aeroplanino
 
 # --- multiplayer (game/rete.gd) ---------------------------------------------------
 const PVP_DAMAGE := 5.0           # danno a un altro giocatore = danno dell'arma x questo (vita 100)
