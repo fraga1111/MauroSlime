@@ -36,7 +36,7 @@ var _ip_edit: LineEdit
 var _net_status: Label
 var _net_btns: Array[Button] = []
 var _root: Control
-var _history: PanelContainer      # pannello STORICO E RECORD (null = chiuso)
+var _history: Control             # pannello STORICO E RECORD (null = chiuso)
 ## ultimi nome e IP usati (restano quando si torna al menu)
 static var last_name := ""
 static var last_ip := ""
@@ -141,19 +141,26 @@ func toggle_history() -> void:
 		_history = null
 		return
 	var all := Storico.example() if "--storico" in OS.get_cmdline_user_args() else Storico.load_all()
-	_history = PanelContainer.new()
-	_history.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_history.offset_left = 120.0
-	_history.offset_right = -120.0
-	_history.offset_top = 70.0
-	_history.offset_bottom = -70.0
-	var st := _style(Color(1.0, 0.85, 0.4), 0.95, 3)
+	# velo scuro su tutto il menu (sopra a ogni altro pezzo) e pannello opaco al centro
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.8)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.z_index = 100
+	_root.add_child(dim)
+	_history = dim
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.offset_left = 120.0
+	panel.offset_right = -120.0
+	panel.offset_top = 70.0
+	panel.offset_bottom = -70.0
+	var st := _style(Color(1.0, 0.85, 0.4), 1.0, 3)
 	st.set_content_margin_all(24)
-	_history.add_theme_stylebox_override("panel", st)
-	_root.add_child(_history)
+	panel.add_theme_stylebox_override("panel", st)
+	dim.add_child(panel)
 	var outer := VBoxContainer.new()
 	outer.add_theme_constant_override("separation", 12)
-	_history.add_child(outer)
+	panel.add_child(outer)
 	var top := HBoxContainer.new()
 	outer.add_child(top)
 	var title := _cell(top, "STORICO E RECORD", 36, Color(1.0, 0.85, 0.4))
