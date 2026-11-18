@@ -6,7 +6,8 @@
 #   --char=N                      -> con --rapido, la partita è col personaggio N (default 0)
 #   --solo=nome1,nome2            -> fa SOLO questi screenshot (implica --shots), es. --solo=ritratti,menu
 #                                    nomi: menu stanza_dall_alto terza_persona spillatrice telefono pinza sopra_la_scrivania
-#                                          rampa muro_di_fianco spalle_al_muro visuale_frontale a_terra garage macchinina aeroplanino nemici ritratti armi
+#                                          rampa muro_di_fianco spalle_al_muro visuale_frontale a_terra garage macchinina aeroplanino nemici
+#                                          forziere classifica storico ritratti armi
 # Finisce con "TUTTO OK" oppure "CI SONO ERRORI".
 
 cd "$(dirname "$0")/.." || exit 1
@@ -71,7 +72,12 @@ out=$(timeout 300 "$G" --headless --fixed-fps 60 --path . -s res://tools/test_ne
 echo "$out" | grep -E "^ondata|TEST|ERROR" | head -30
 echo "$out" | grep -q "TEST OK" || fail=1
 echo "$out" | grep -qE "SCRIPT ERROR|Parse Error" && fail=1
-echo "7) test co-op online: chi ospita e un amico contro le stesse ondate"
+echo "7) test novità: classifica, nemici con alone e senza il tuo personaggio, forziere, zoom, storico"
+out=$(timeout 300 "$G" --headless --fixed-fps 60 --path . -s res://tools/test_novita.gd 2>&1)
+echo "$out" | grep -E "^ondata|^io:|^armi|^zoom|^storico|TEST|ERROR" | head -30
+echo "$out" | grep -q "TEST OK" || fail=1
+echo "$out" | grep -qE "SCRIPT ERROR|Parse Error" && fail=1
+echo "8) test co-op online: chi ospita e un amico contro le stesse ondate"
 out=$(bash tools/test_coop.sh 2>&1)
 echo "$out" | tail -8
 echo "$out" | tail -1 | grep -q "TEST OK" || fail=1
@@ -106,6 +112,9 @@ if [ $shots = 1 ]; then
 	shot macchinina --path . -- --autostart --char=0 --guida
 	shot aeroplanino --path . -- --autostart --char=3 --vola
 	shot nemici --path . -- --autostart --char=0 --shotframe=600
+	shot forziere --path . -- --autostart --char=4 --door --forziere --nonemici --shotframe=200
+	shot classifica --path . -- --autostart --char=0 --door --classifica --nonemici
+	shot storico --path . -- --storico
 	shot ritratti --path . -s res://tools/ritratti.gd --
 	shot armi --path . -s res://tools/armi.gd --
 	ls tools/shots

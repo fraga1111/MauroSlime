@@ -1,6 +1,6 @@
 extends RefCounted
-## ARMI. Tutti i personaggi possono usare tutte le armi: si sceglie nel menu e resta quella
-## per tutta la partita (in partita non si cambia).
+## ARMI. Tutti i personaggi possono usare tutte le armi: si parte con quella scelta nel menu;
+## a fine ondata il forziere (game/forziere.gd) ne dà una seconda diversa (1 / 2, rotellina o Q per cambiare).
 ## Per aggiungere un'arma: copia un blocco { ... } e fai il modello in actors/gun_models.gd.
 ##
 ## name        nome a schermo

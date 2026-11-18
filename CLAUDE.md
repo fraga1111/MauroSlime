@@ -3,7 +3,9 @@
 Sparatutto in prima/terza persona fatto in **Godot 4.7.2 + GDScript**. Il giocatore è un omino alto
 10 cm dentro un vero ufficio di circa 3 × 4,5 m (ricostruito dalle foto in `ft/`). GIOCA OFFLINE: ondate di nemici
 (gli stessi omini del menu) che ti sparano, sempre più difficili. Online (OSPITA) si sceglie CO-OP (le stesse ondate tutti insieme)
-o TUTTI CONTRO TUTTI. L'arma si sceglie nel menu e in partita non si cambia.
+o TUTTI CONTRO TUTTI. L'arma si sceglie nel menu; dopo ogni ondata un forziere ne dà una seconda (si portano 2 armi).
+I nemici hanno un alone rosso e non usano mai i personaggi dei giocatori. Punti = danni fatti; a fine partita (e con Tab)
+c'è la classifica con uccisioni e assist, e ogni partita finita va nello STORICO (record e classifica di tutti i tempi, tasto H nel menu).
 **Tutto è generato da codice**: niente modelli 3D o scene da editor (c'è solo `main.tscn`, vuota).
 Eccezioni: le texture delle persone vere (Matteo, Broski) sono ritagli delle loro foto (`StanzaFPS/textures/persone/`),
 e una persona vera può avere un modello fatto in Blender (`StanzaFPS/modelli/<look>.glb`): se c'è, il gioco usa quello.
@@ -48,6 +50,9 @@ MauroSlime/
    │  ├─ game/input_setup.gd    tasti
    │  ├─ game/rete.gd           MULTIPLAYER in rete locale: ospita / unisciti, faro per trovare le partite, versione
    │  ├─ game/munizioni.gd      scatole di graffette a terra (un caricatore in più per ogni arma)
+   │  ├─ game/punteggi.gd       punti (= danni), uccisioni, assist di ogni giocatore; classifica (offline e rete)
+   │  ├─ game/storico.gd        storico delle partite e record (user://storico.json)
+   │  ├─ game/forziere.gd       forziere di fine ondata: dà una seconda arma
    │  ├─ actors/effetti.gd      colpi luminosi (tracer) e segni sui muri (buco o macchia colorata)
    │  ├─ ui/hud.gd              interfaccia in partita
    │  ├─ ui/menu.gd             schede del menu iniziale
@@ -61,6 +66,7 @@ MauroSlime/
       ├─ test_coop.sh / .gd     test co-op: due copie del gioco (ospita + unisciti) contro le stesse ondate
       ├─ test_moves.gd          test di corsa, scivolata, a terra, visuale frontale, super salto (sedia)
       ├─ test_veicoli.gd        test di macchinina (gas, sterzo, rampa, scendere) e aeroplanino (decollo)
+      ├─ test_novita.gd         test di classifica/assist, nemici (alone, niente tuo personaggio), forziere, zoom, storico
       ├─ ritratti.gd            screenshot di tutti i personaggi (davanti, 3/4, fianco, dietro)
       ├─ armi.gd                primo piano di tutte le armi (fianco, alto, dietro)
       ├─ graffette.gd           primo piano della scatola di graffette e delle macchie fluo
@@ -131,6 +137,11 @@ MauroSlime/
 | Munizioni a terra (graffette) | `config.gd` + `world/room.gd` | sezione "munizioni" (ogni quanto, quante, caricatori) e `PICKUP_SPOTS`; modello in `game/munizioni.gd` |
 | Colpi colorati di un'arma | `data/weapons.gd` | campi `tracer` (colpo che vola) e `splat` (macchia sul muro) |
 | Colpi in testa | `config.gd` | `HEADSHOT_MULT`; zona della testa in `actors/avatar.gd` (`take_hit`) |
+| Punti, uccisioni, assist, classifica | `game/punteggi.gd` + `config.gd` | `POINTS_PER_DAMAGE`; chi avvisa: `nemico.gd apply_damage` (via `ondate.enemy_damaged`), `rete.gd _hit` (tutti contro tutti); classifica a schermo in `ui/hud.gd show_scoreboard` (Tab e fine partita, `_show_end` in main.gd) |
+| Storico partite e record | `game/storico.gd` + `ui/menu.gd` | salvataggio in `main.gd _save_history`; record in `records()`, classifica di tutti i tempi in `leaderboard()`; pannello nel menu `toggle_history` (tasto H) |
+| Forziere di fine ondata (seconda arma) | `game/forziere.gd` + `config.gd` | sezione "forziere" (`MAX_WEAPONS`...); lo crea `main.gd _spawn_chest`; armi portate in `player.gd` (`owned`, `give_weapon`) |
+| Alone rosso dei nemici | `config.gd` + `actors/nemico.gd` | `ENEMY_AURA_COLOR`, `ENEMY_AURA_GROW`; shader `AURA_SHADER` |
+| Zoom (click destro forte, doppio click leggero) | `config.gd` + `actors/player.gd` | `TP_ADS_FOV`, `TP_ADS_LIGHT_FOV`, `ZOOM_DOUBLE_CLICK`, `ZOOM_HOLD`; logica in `_zoom_click` |
 | Tasti | `game/input_setup.gd` | dizionari `KEYS` e `MOUSE` |
 | Testi e grafica di HUD e menu | `ui/hud.gd`, `ui/menu.gd` | |
 | Posizione degli omini e della telecamera nel menu | `ui/menu_stage.gd` | costanti in cima (metri reali) |
@@ -171,4 +182,4 @@ Gli screenshot vanno **guardati** dopo modifiche grafiche o alla stanza (quali: 
 
 Opzioni da riga di comando del gioco, utili per provare (`Godot..._console.exe --path . -- <opzioni>`):
 `--autostart` (salta il menu), `--fps` o `--fps=SECONDI` (stampa FPS, disegni e triangoli ed esce; in partita F3 mostra/nasconde gli FPS), `--char=N`, `--weapon=N` (arma di partenza), `--fp` (prima persona), `--shot=percorso.png` (screenshot dopo 90 frame ed esce),
-`--minecraft` (persone vere a cubi), `--nonemici` (offline senza ondate), `--host` / `--join=IP` / `--name=NOME` (multiplayer), `--shotframe=N` (screenshot al fotogramma N), `--overview` / `--desk` / `--door` / `--garage` (posizioni della telecamera o del giocatore), `--front` (visuale frontale), `--prone` (sdraiato), `--guida` (seduto in macchinina), `--vola` (sull'aeroplanino in volo).
+`--minecraft` (persone vere a cubi), `--nonemici` (offline senza ondate), `--forziere` / `--classifica` (forziere o classifica finta, per gli screenshot), `--storico` (menu con lo storico d'esempio aperto), `--nosalva` (non scrive lo storico), `--host` / `--join=IP` / `--name=NOME` (multiplayer), `--shotframe=N` (screenshot al fotogramma N), `--overview` / `--desk` / `--door` / `--garage` (posizioni della telecamera o del giocatore), `--front` (visuale frontale), `--prone` (sdraiato), `--guida` (seduto in macchinina), `--vola` (sull'aeroplanino in volo).

@@ -3,7 +3,8 @@ extends RefCounted
 ## Per aggiungere un personaggio: copia un blocco { ... }, cambia i valori. Nient'altro da toccare.
 ## Tutti i personaggi sono UGUALI come abilità (vita, velocità, salto in config.gd)
 ## e possono usare tutte le armi (data/weapons.gd): l'arma si sceglie nel menu dopo il personaggio
-## e si può cambiare anche in partita. Cambia solo l'aspetto.
+## (la seconda arriva dal forziere di fine ondata). Cambia solo l'aspetto.
+## I nemici delle ondate sono questi stessi omini, ma mai quelli usati dai giocatori.
 ##
 ## Testi:     name (nome nella scheda del menu)
 ## Aspetto:   hat        copricapo: "helmet" | "bandana" | "hardhat"  (nuovi in actors/character_model.gd)

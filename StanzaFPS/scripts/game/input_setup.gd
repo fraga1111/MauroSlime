@@ -17,6 +17,10 @@ const KEYS := {
 	"reload": [KEY_R],
 	"interact": [KEY_E],              # sali / scendi dalla macchinina o dall'aeroplanino (actors/veicolo.gd)
 	"lights": [KEY_L],                # fari della macchinina
+	"weapon_next": [KEY_Q],           # passa all'altra arma (quella presa dal forziere)
+	"weapon_1": [KEY_1],
+	"weapon_2": [KEY_2],
+	"scoreboard": [KEY_TAB],          # tenuto = classifica della partita
 }
 
 ## Più tasti del mouse per la stessa azione: lista di pulsanti
@@ -24,6 +28,7 @@ const MOUSE := {
 	"fire": [MOUSE_BUTTON_LEFT],
 	"aim": [MOUSE_BUTTON_RIGHT],
 	"sprint": [MOUSE_BUTTON_XBUTTON1, MOUSE_BUTTON_XBUTTON2],   # tasti laterali del mouse (pollice)
+	"weapon_next": [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN],
 }
 
 

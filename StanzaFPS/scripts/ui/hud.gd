@@ -1,5 +1,8 @@
 extends CanvasLayer
 ## Interfaccia: barra della vita in alto, mirino, munizioni, messaggi.
+## CLASSIFICA (show_scoreboard): tenendo Tab in partita e a fine partita; le righe le dà game/punteggi.gd.
+
+const Characters := preload("res://scripts/data/characters.gd")
 
 var _root: Control
 var _hp: Label
@@ -25,6 +28,9 @@ var _wave: Label                 # in alto a destra (solo offline): ondata, nemi
 var _wave_n := 0
 var _left := 0
 var _score := 0
+var _my_score := -1              # i miei punti (solo online, quando non coincidono con quelli della squadra)
+var _board: PanelContainer       # classifica al centro dello schermo
+var _board_key := ""
 
 
 func _ready() -> void:
@@ -234,14 +240,91 @@ func set_enemies_left(n: int) -> void:
 	_draw_wave()
 
 
-func set_score(score: int) -> void:
+## score = punti della squadra; mine = i miei (-1 se si gioca da soli).
+func set_score(score: int, mine := -1) -> void:
 	_score = score
+	_my_score = mine
 	_draw_wave()
 
 
 func _draw_wave() -> void:
 	_wave.visible = true
 	_wave.text = "ONDATA %d\nNemici: %d\nPunti: %d" % [_wave_n, _left, _score]
+	if _my_score >= 0:
+		_wave.text += "\nI tuoi: %d" % _my_score
+
+
+## Classifica al centro: title in alto, una riga per giocatore (ordinate per punti), footer sotto.
+## me = id di rete del giocatore di questo computer (la sua riga è evidenziata).
+func show_scoreboard(title: String, rows: Array, me: int, footer := "") -> void:
+	var key := "%s|%s|%d|%s" % [title, str(rows), me, footer]
+	if _board and _board.visible and key == _board_key:
+		return
+	_board_key = key
+	if _board:
+		_board.queue_free()
+	_board = PanelContainer.new()
+	_board.set_anchors_preset(Control.PRESET_CENTER)
+	_board.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_board.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.04, 0.05, 0.07, 0.88)
+	st.border_color = Color(1.0, 0.85, 0.4)
+	st.set_border_width_all(3)
+	st.set_corner_radius_all(14)
+	st.set_content_margin_all(26)
+	_board.add_theme_stylebox_override("panel", st)
+	_root.add_child(_board)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_board.add_child(box)
+	box.add_child(_cell(title, 38, Color(1.0, 0.85, 0.4), HORIZONTAL_ALIGNMENT_CENTER))
+	var grid := GridContainer.new()
+	grid.columns = 8
+	grid.add_theme_constant_override("h_separation", 30)
+	grid.add_theme_constant_override("v_separation", 8)
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(grid)
+	for h in ["#", "GIOCATORE", "PUNTI", "UCCISIONI", "ASSIST", "DANNI", "IN TESTA", "A TERRA"]:
+		grid.add_child(_cell(h, 18, Color(1, 1, 1, 0.6)))
+	for i in rows.size():
+		var r: Dictionary = rows[i]
+		var mine := int(r.get("peer", 0)) == me
+		var ci := clampi(int(r.get("char", 0)), 0, Characters.LIST.size() - 1)
+		var accent: Color = Characters.LIST[ci]["accent"]
+		var c := Color(1.0, 0.95, 0.6) if mine else Color.WHITE
+		var best := i == 0 and rows.size() > 1 and int(r.get("points", 0)) > 0
+		grid.add_child(_cell("%d" % (i + 1), 24, c))
+		grid.add_child(_cell("%s%s%s" % [r.get("name", "?"), "  (tu)" if mine and rows.size() > 1 else "",
+				"  ★ MVP" if best else ""], 24, accent))
+		grid.add_child(_cell(str(r.get("points", 0)), 26, Color(1.0, 0.85, 0.4)))
+		grid.add_child(_cell(str(r.get("kills", 0)), 24, c))
+		grid.add_child(_cell(str(r.get("assists", 0)), 24, c))
+		grid.add_child(_cell("%.0f" % float(r.get("damage", 0.0)), 24, c))
+		grid.add_child(_cell(str(r.get("heads", 0)), 24, c))
+		grid.add_child(_cell(str(r.get("deaths", 0)), 24, c))
+	if footer != "":
+		box.add_child(_cell(footer, 22, Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER))
+
+
+func hide_scoreboard() -> void:
+	if _board:
+		_board.visible = false
+		_board_key = ""
+
+
+func _cell(text: String, font_size: int, color: Color, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.horizontal_alignment = align
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_outline_color", Color.BLACK)
+	l.add_theme_constant_override("outline_size", 6)
+	return l
 
 
 func show_message(text: String, duration := 0.0) -> void:

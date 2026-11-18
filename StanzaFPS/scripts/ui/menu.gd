@@ -21,6 +21,7 @@ const Characters := preload("res://scripts/data/characters.gd")
 const Weapons := preload("res://scripts/data/weapons.gd")
 const Rete := preload("res://scripts/game/rete.gd")
 const LooksMinecraft := preload("res://scripts/data/looks_minecraft.gd")
+const Storico := preload("res://scripts/game/storico.gd")
 
 var index := 0
 var weapon := 0
@@ -34,6 +35,8 @@ var _name_edit: LineEdit
 var _ip_edit: LineEdit
 var _net_status: Label
 var _net_btns: Array[Button] = []
+var _root: Control
+var _history: PanelContainer      # pannello STORICO E RECORD (null = chiuso)
 ## ultimi nome e IP usati (restano quando si torna al menu)
 static var last_name := ""
 static var last_ip := ""
@@ -111,16 +114,124 @@ func _ready() -> void:
 	_play_btn.pressed.connect(_play)
 	_style_btn = _button(row, Vector2(330, 54))
 	_style_btn.pressed.connect(toggle_style)
+	var hist_btn := _button(row, Vector2(260, 54))
+	hist_btn.text = "STORICO E RECORD  (H)"
+	hist_btn.add_theme_font_size_override("font_size", 19)
+	hist_btn.pressed.connect(toggle_history)
 
 	var help := _label(root, 13, HORIZONTAL_ALIGNMENT_CENTER)
 	help.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	help.offset_top = -40.0
 	help.offset_bottom = -3.0
-	help.text = "WASD muovi · Shift (o tasto laterale del mouse) corri · Spazio salta · B super salto · F scivolata · Ctrl accovacciati · Z a terra\nClick sx spara · Click dx mira · R ricarica · T aspetto (Matteo, Broski) · V visuale frontale · E sali in macchinina o sull'aeroplanino · Esc libera il mouse"
+	help.text = "WASD muovi · Shift (o tasto laterale del mouse) corri · Spazio salta · B super salto · F scivolata · Ctrl accovacciati · Z a terra · Tab classifica\nClick sx spara · Click dx ZOOM forte (doppio click = zoom leggero) · 1 / 2, rotellina o Q cambia arma (la seconda arriva dal forziere) · R ricarica · T aspetto · V visuale frontale · E sali in macchinina o sull'aeroplanino · Esc libera il mouse"
 	help.modulate = Color(1, 1, 1, 0.75)
 
+	_root = root
 	_build_net_panel(root)
 	_refresh()
+	if "--storico" in OS.get_cmdline_user_args():
+		toggle_history.call_deferred()       # screenshot dello storico (con partite d'esempio, Storico.example)
+
+
+## STORICO E RECORD (tasto H): record, classifica di tutti i tempi per giocatore e ultime partite
+## (dati salvati da main.gd a fine partita in game/storico.gd). Si chiude con H, Esc o CHIUDI.
+func toggle_history() -> void:
+	if _history and is_instance_valid(_history):
+		_history.queue_free()
+		_history = null
+		return
+	var all := Storico.example() if "--storico" in OS.get_cmdline_user_args() else Storico.load_all()
+	_history = PanelContainer.new()
+	_history.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_history.offset_left = 120.0
+	_history.offset_right = -120.0
+	_history.offset_top = 70.0
+	_history.offset_bottom = -70.0
+	var st := _style(Color(1.0, 0.85, 0.4), 0.95, 3)
+	st.set_content_margin_all(24)
+	_history.add_theme_stylebox_override("panel", st)
+	_root.add_child(_history)
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 12)
+	_history.add_child(outer)
+	var top := HBoxContainer.new()
+	outer.add_child(top)
+	var title := _cell(top, "STORICO E RECORD", 36, Color(1.0, 0.85, 0.4))
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var close := _button(top, Vector2(200, 46))
+	close.text = "CHIUDI  (H)"
+	close.pressed.connect(toggle_history)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	scroll.add_child(box)
+	if all.is_empty():
+		_cell(box, "Ancora nessuna partita finita: gioca un'ondata e torna qui!", 22, Color.WHITE)
+		return
+
+	_cell(box, "RECORD", 26, Color(0.35, 0.95, 0.4))
+	var rec := _grid(box, 3)
+	for r in Storico.records(all):
+		_cell(rec, String(r[0]), 20, Color(1, 1, 1, 0.85))
+		_cell(rec, String(r[1]), 22, Color(1.0, 0.85, 0.4))
+		_cell(rec, String(r[2]), 18, Color(1, 1, 1, 0.6))
+
+	_cell(box, "\nCLASSIFICA DI TUTTI I TEMPI", 26, Color(0.35, 0.95, 0.4))
+	var lb := _grid(box, 9)
+	for h in ["#", "GIOCATORE", "PARTITE", "UCCISIONI", "ASSIST", "PUNTI", "DANNI", "MIGLIOR PARTITA", "ONDATA MAX"]:
+		_cell(lb, h, 16, Color(1, 1, 1, 0.6))
+	var board := Storico.leaderboard(all)
+	for i in board.size():
+		var b: Dictionary = board[i]
+		var c := Color(1.0, 0.85, 0.4) if i == 0 else Color.WHITE
+		_cell(lb, str(i + 1), 20, c)
+		_cell(lb, String(b["name"]), 20, c)
+		_cell(lb, str(b["partite"]), 20, c)
+		_cell(lb, str(b["kills"]), 20, c)
+		_cell(lb, str(b["assists"]), 20, c)
+		_cell(lb, str(b["points"]), 20, c)
+		_cell(lb, "%.0f" % float(b["damage"]), 20, c)
+		_cell(lb, str(b["best"]), 20, c)
+		_cell(lb, str(b["best_wave"]), 20, c)
+
+	_cell(box, "\nULTIME PARTITE", 26, Color(0.35, 0.95, 0.4))
+	var last := _grid(box, 5)
+	for h in ["QUANDO", "MODO", "ONDATA", "VINCITORE (punti)", "GIOCATORI"]:
+		_cell(last, h, 16, Color(1, 1, 1, 0.6))
+	for k in mini(all.size(), 15):
+		var e: Dictionary = all[all.size() - 1 - k]
+		var righe: Array = e.get("righe", [])
+		var who := []
+		for r in righe:
+			who.append("%s %d" % [r.get("name", "?"), int(r.get("points", 0))])
+		var first: Dictionary = righe[0] if righe.size() > 0 else {}
+		_cell(last, String(e.get("data", "")).replace("T", " ").substr(0, 16), 18, Color.WHITE)
+		_cell(last, String(e.get("modo", "")).to_upper(), 18, Color.WHITE)
+		_cell(last, str(int(e.get("ondata", 0))), 18, Color.WHITE)
+		_cell(last, "%s (%d)" % [first.get("name", "?"), int(first.get("points", 0))], 18, Color(1.0, 0.85, 0.4))
+		_cell(last, ", ".join(who), 16, Color(1, 1, 1, 0.75))
+
+
+func _grid(parent: Control, cols: int) -> GridContainer:
+	var g := GridContainer.new()
+	g.columns = cols
+	g.add_theme_constant_override("h_separation", 28)
+	g.add_theme_constant_override("v_separation", 6)
+	parent.add_child(g)
+	return g
+
+
+func _cell(parent: Control, text: String, font_size: int, color: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_color_override("font_color", color)
+	parent.add_child(l)
+	return l
 
 
 ## Pannello MULTIPLAYER in alto a destra: nome, il tuo IP, OSPITA, IP dell'amico + UNISCITI.
@@ -321,6 +432,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var n := Characters.LIST.size()
 	var key: int = event.keycode
+	if _history:
+		# storico aperto: si chiude con H o Esc, gli altri tasti non fanno niente
+		if key == KEY_H or key == KEY_ESCAPE:
+			toggle_history()
+		get_viewport().set_input_as_handled()
+		return
+	if key == KEY_H:
+		toggle_history()
+		get_viewport().set_input_as_handled()
+		return
 	# tasti numerici 1..9 = personaggio corrispondente
 	if key >= KEY_1 and key <= KEY_9 and key - KEY_1 < n:
 		select(key - KEY_1)
@@ -378,6 +499,8 @@ func toggle_style() -> void:
 
 
 func _play() -> void:
+	_player_name()                    # il nome serve anche offline (classifica e storico)
+	_save_settings()
 	start_game.emit(index, weapon, style_of(index))
 
 

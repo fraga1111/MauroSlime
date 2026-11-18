@@ -9,8 +9,10 @@ extends CharacterBody3D
 ## CO-OP ONLINE: il nemico "vero" (che pensa, cammina e spara) esiste solo su chi ospita. Sugli altri
 ## computer c'è una COPIA (puppet = true) che si limita a seguire posizione e spari mandati dalla rete;
 ## se la colpisci, il danno viene mandato a chi ospita (game/ondate.gd).
+## I nemici hanno un ALONE ROSSO (AURA_SHADER) per riconoscerli dagli amici, che non ce l'hanno.
+## Chi li colpisce prende punti (i danni fatti), uccisioni e assist: li conta game/punteggi.gd.
 
-signal died(points: int)
+signal died
 
 const Config := preload("res://scripts/config.gd")
 const Characters := preload("res://scripts/data/characters.gd")
@@ -77,6 +79,7 @@ func _ready() -> void:
 	_model = CharacterModel.new()
 	_model.setup(d)
 	add_child(_model)
+	_add_aura()
 
 	var cap := CapsuleShape3D.new()
 	cap.radius = Config.PLAYER_RADIUS * _scale
@@ -100,6 +103,41 @@ func _ready() -> void:
 	_strafe = 1.0 if randf() < 0.5 else -1.0
 	_strafe_t = randf_range(1.0, 2.5)
 	_shot_cd = reaction
+
+
+## Alone rosso intorno all'omino: ogni pezzo del modello viene ridisegnato un filo più grande,
+## rosso e trasparente al centro e acceso sui bordi (così si vede da lontano e dietro i mobili bassi).
+func _add_aura() -> void:
+	var m := ShaderMaterial.new()
+	m.shader = _aura_shader()
+	m.set_shader_parameter("grow", Config.ENEMY_AURA_GROW * (1.5 if boss else 1.0))
+	m.set_shader_parameter("tint", Config.ENEMY_AURA_COLOR)
+	for n in _model.find_children("*", "MeshInstance3D", true, false):
+		(n as MeshInstance3D).material_overlay = m
+
+
+static var _shader_cache: Shader
+static func _aura_shader() -> Shader:
+	if _shader_cache == null:
+		_shader_cache = Shader.new()
+		_shader_cache.code = AURA_SHADER
+	return _shader_cache
+
+
+const AURA_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_back, shadows_disabled;
+uniform float grow = 0.03;
+uniform vec4 tint : source_color = vec4(1.0, 0.1, 0.05, 1.0);
+void vertex() {
+	VERTEX += NORMAL * grow;
+}
+void fragment() {
+	float rim = 1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
+	float a = pow(rim, 2.0) * 1.6 + 0.12;
+	ALBEDO = tint.rgb * a * tint.a;
+}
+"""
 
 
 func _update_label() -> void:
@@ -185,7 +223,7 @@ func _physics_process(delta: float) -> void:
 		_shoot(chest)
 
 	if global_position.y < -40.0:
-		_die(false)
+		_die()
 
 
 func hspeed() -> float:
@@ -280,29 +318,34 @@ func take_hit(dmg: float, pos_hit: Vector3, dir: Vector3) -> bool:
 	if puppet:
 		ondate.send_hit(net_id, amount, head)      # il danno lo applica chi ospita
 		return head
-	return apply_damage(amount, head, dir)
+	return apply_damage(amount, head, dir, ondate.my_id())
 
 
-## Toglie vita (anche per i colpi degli altri giocatori in co-op). Ritorna true se muore.
-func apply_damage(amount: float, head: bool, dir := Vector3.ZERO) -> bool:
+## Toglie vita (anche per i colpi degli altri giocatori in co-op). attacker = chi ha sparato (id di rete,
+## 1 offline): prende i punti dei danni fatti e, se è il colpo che lo stende, l'uccisione.
+## Ritorna true se muore.
+func apply_damage(amount: float, head: bool, dir := Vector3.ZERO, attacker := 0) -> bool:
 	if _dead:
 		return false
+	var dealt := minf(amount, maxf(hp, 0.0))       # i danni oltre la vita rimasta non contano
 	hp -= amount
 	velocity += Vector3(dir.x, 0.0, dir.z) * 2.0
 	_seen_for = maxf(_seen_for, reaction * 0.5)     # colpito: si accorge di te
 	_update_label()
-	if hp <= 0.0:
-		_die(head)
+	var killed := hp <= 0.0
+	if attacker != 0:
+		ondate.enemy_damaged(attacker, net_id, dealt, head, killed)
+	if killed:
+		_die()
 		return true
 	return head
 
 
-func _die(head: bool) -> void:
+func _die() -> void:
 	if _dead:
 		return
-	var points := (500 if boss else 100) + (50 if head else 0)
 	fall()
-	died.emit(points)
+	died.emit()
 
 
 ## Cade a terra e sparisce dopo un po' (sulle copie di rete lo chiama game/ondate.gd).

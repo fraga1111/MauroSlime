@@ -20,6 +20,10 @@ const Munizioni := preload("res://scripts/game/munizioni.gd")
 const Macchinina := preload("res://scripts/actors/macchinina.gd")
 const Aeroplanino := preload("res://scripts/actors/aeroplanino.gd")
 const Ondate := preload("res://scripts/game/ondate.gd")
+const Punteggi := preload("res://scripts/game/punteggi.gd")
+const Storico := preload("res://scripts/game/storico.gd")
+const Forziere := preload("res://scripts/game/forziere.gd")
+const Menu := preload("res://scripts/ui/menu.gd")
 
 var player: Player
 var macchinina: Macchinina        # Opel Agila bianca a terra (E per guidarla)
@@ -34,10 +38,16 @@ var nemici := true                # false = partita offline senza nemici (test a
 var _nav: NavigationRegion3D      # dove possono camminare i nemici (calcolata all'inizio della partita)
 var player_index := 0            # personaggio scelto (serve alle ondate)
 var _pending := []               # client: partita da avviare quando il collegamento riesce
+var punteggi: Punteggi            # danni, punti, uccisioni e assist di ognuno (classifica)
+var forziere: Forziere            # forziere di fine ondata (una seconda arma)
+var _match_t0 := 0.0             # quando è iniziata la partita (per lo storico)
+var _wave_pts0 := 0              # i miei punti all'inizio dell'ondata in corso
+var _best_wave_pts := 0          # i miei punti nella mia ondata migliore (record nello storico)
+var _saved := false              # partita già salvata nello storico
 
 # opzioni da riga di comando, solo per test automatici (vedi CLAUDE.md):
 #   --autostart  --char=N  --weapon=N  --minecraft  --host  --join=IP  --name=NOME  --shot=file.png  --overview | --desk | --door | --ramp | --wall | --back
-#   --guida (seduto in macchinina)  --vola (sull'aeroplanino, già in volo)
+#   --guida (seduto in macchinina)  --vola (sull'aeroplanino, già in volo)  --nosalva (niente storico)
 var _shot_path := ""
 var _shot_frames := 0
 var _shot_at := 90               # --shotframe=N: fotogramma dello screenshot
@@ -78,6 +88,12 @@ func _ready() -> void:
 	rete.message.connect(func(t: String) -> void:
 		if hud:
 			hud.show_message(t, 3.0))
+	punteggi = Punteggi.new()
+	punteggi.name = "Punteggi"
+	punteggi.rete = rete
+	rete.punteggi = punteggi
+	add_child(punteggi)
+	punteggi.changed.connect(_update_score)
 	munizioni = Munizioni.new()
 	munizioni.name = "Munizioni"
 	add_child(munizioni)
@@ -165,6 +181,11 @@ func start_game(index: int, weapon := 0, stile := "") -> void:
 	if stile != "":
 		data["stile"] = stile              # persone vere: "blender" o "minecraft" (scelto nel menu)
 	_spawn_vehicles()
+	if not rete.online:
+		# offline: il nome del menu serve alla classifica e allo storico
+		var nm := Menu.last_name if Menu.last_name != "" else String(data["name"])
+		rete.my_info = _net_info(index, weapon, stile, nm)
+	_match_t0 = Time.get_ticks_msec() / 1000.0
 
 	player = Player.new()
 	player.char_data = data
@@ -181,7 +202,7 @@ func start_game(index: int, weapon := 0, stile := "") -> void:
 	add_child(hud)
 	hud.set_health(player.hp)
 	hud.set_ammo(player.mag, player.reserve, false)
-	hud.set_weapon(String(player.Weapons.LIST[player.weapon]["name"]))
+	hud.set_weapon(player.weapon_label())
 	hud.show_message("%s è pronto!" % data["name"], 2.5)
 
 	player.health_changed.connect(_on_health_changed)
@@ -216,27 +237,92 @@ func _start_waves(index: int) -> void:
 	ondate.rete = rete
 	ondate.player = player
 	ondate.player_char = index
+	ondate.punteggi = punteggi
 	ondate.spawn_parent = self
 	add_child(ondate)
 	ondate.wave_started.connect(func(w: int, boss: bool) -> void:
 		hud.set_wave(w)
+		_wave_pts0 = int(punteggi.my_row().get("points", 0))
 		hud.show_message("ONDATA %d%s" % [w, "\nARRIVA UN CAPO!" if boss else ""], 2.5))
 	ondate.wave_cleared.connect(func(w: int) -> void:
+		_best_wave_pts = maxi(_best_wave_pts, int(punteggi.my_row().get("points", 0)) - _wave_pts0)
 		if not player.alive:
 			player.respawn()                          # co-op: chi era a terra rientra
 		else:
 			player.heal(Config.WAVE_CLEAR_HEAL)
 		player.add_clips(Config.WAVE_CLEAR_CLIPS)
-		hud.show_message("ONDATA %d SUPERATA!\n+vita  +graffette" % w, 3.0))
+		hud.show_message("ONDATA %d SUPERATA!\n+vita  +graffette  +FORZIERE con un'arma nuova" % w, 3.5)
+		_spawn_chest())
 	ondate.all_down.connect(_on_all_down)
-	ondate.score_changed.connect(hud.set_score)
 	ondate.enemies_changed.connect(hud.set_enemies_left)
 	hud.set_wave(0)
-	hud.set_score(0)
+	_update_score()
 	if leader:
 		ondate.start()
 	else:
 		hud.show_message("CO-OP: tutti insieme contro le ondate!", 3.0)
+
+
+## Punti in alto a destra: della squadra e, se si gioca in tanti, anche i miei (game/punteggi.gd).
+func _update_score() -> void:
+	if hud == null or ondate == null:
+		return
+	var mine := -1
+	if rete.online:
+		mine = int(punteggi.my_row().get("points", 0))
+	hud.set_score(punteggi.total_points(), mine)
+
+
+## Fine ondata: forziere davanti al giocatore con un'arma che non ha (game/forziere.gd).
+func _spawn_chest() -> void:
+	if not is_instance_valid(player):
+		return
+	if forziere and is_instance_valid(forziere):
+		forziere.close_and_free()
+	forziere = Forziere.new()
+	forziere.name = "Forziere"
+	forziere.player = player
+	forziere.weapon = Forziere.pick_weapon(player.owned)
+	add_child(forziere)
+	var pos := Forziere.pick_spot(player)
+	forziere.global_position = pos
+	var to: Vector3 = player.global_position - pos
+	forziere.rotation.y = atan2(-to.x, -to.z)         # la serratura guarda verso il giocatore
+	forziere.taken.connect(func(_w: int, dropped: String) -> void:
+		hud.show_message("HAI PRESO: %s%s\n1 / 2, rotellina o Q per cambiare arma" % [
+				Player.Weapons.LIST[_w]["name"], ("\n(lasci %s)" % dropped) if dropped != "" else ""], 3.0))
+
+
+## Classifica a fine partita (e salvataggio nello storico, game/storico.gd).
+func _show_end(title: String, wave: int) -> void:
+	game_over = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	hud.show_message("")
+	var rows := punteggi.rows()
+	hud.show_scoreboard(title, rows, punteggi.my_id(),
+			"Arrivati all'ondata %d  ·  punti di squadra %d\n\nPremi INVIO per tornare al menu" % [wave, punteggi.total_points()])
+	_save_history(wave, rows)
+
+
+func _save_history(wave: int, rows: Array) -> void:
+	# i test automatici (main aggiunto da uno script, non come scena) non sporcano lo storico
+	if _saved or get_tree().current_scene != self or "--nosalva" in OS.get_cmdline_user_args():
+		return
+	_saved = true
+	var righe := []
+	for r in rows:
+		righe.append({"name": r["name"], "char": r["char"], "points": r["points"], "damage": r["damage"],
+				"kills": r["kills"], "assists": r["assists"], "heads": r["heads"], "deaths": r["deaths"]})
+	Storico.add({
+		"data": Time.get_datetime_string_from_system(false, true),
+		"modo": "offline" if not rete.online else ("coop" if rete.coop else "tutti contro tutti"),
+		"ondata": wave,
+		"io": String(rete.my_info.get("name", "?")),
+		"personaggio": String(Characters.LIST[player_index]["name"]),
+		"durata": int(Time.get_ticks_msec() / 1000.0 - _match_t0),
+		"ondata_top": _best_wave_pts,
+		"righe": righe,
+	})
 
 
 ## Macchinina e aeroplanino nei loro posti (world/room.gd: CAR_SPOT, PLANE_SPOT). Ognuno ha i suoi:
@@ -264,6 +350,12 @@ func _process(delta: float) -> void:
 			get_tree().quit()
 	if player:
 		hud.update_crosshair(player.current_spread)
+		if not game_over:
+			# Tab tenuto: classifica della partita in corso
+			if Input.is_action_pressed("scoreboard"):
+				hud.show_scoreboard("CLASSIFICA", punteggi.rows(), punteggi.my_id(), "punti = danni fatti x %d" % int(Config.POINTS_PER_DAMAGE))
+			else:
+				hud.hide_scoreboard()
 	if _bench > 0.0 and player:
 		_bench_t += delta
 		_bench_frames += 1
@@ -294,6 +386,7 @@ func _on_health_changed(hp: float) -> void:
 
 
 func _on_player_died() -> void:
+	punteggi.death(punteggi.my_id())
 	if rete.online and rete.coop:
 		hud.show_message("SEI A TERRA!\n\nRientri alla fine dell'ondata,\nse i tuoi amici resistono", 4.0)
 		return
@@ -307,20 +400,19 @@ Rientri tra %d secondi" % int(Config.RESPAWN_TIME), Config.RESPAWN_TIME)
 			player.respawn()
 		return
 	game_over = true
-	var stats := ""
 	if ondate:
 		ondate.stop()
-		stats = "Sei arrivato all'ondata %d con %d punti\n\n" % [ondate.wave, ondate.score]
-	hud.show_message("SEI FUORI GIOCO!\n\n%sPremi INVIO per tornare al menu" % stats)
+		punteggi.flush()
+		_show_end("SEI FUORI GIOCO!", ondate.wave)
+	else:
+		hud.show_message("SEI FUORI GIOCO!\n\nPremi INVIO per tornare al menu")
 
 
 ## CO-OP: tutti i giocatori a terra, la partita è finita (lo decide chi ospita, game/ondate.gd).
-func _on_all_down(wave: int, score: int) -> void:
-	game_over = true
+func _on_all_down(wave: int, _score: int) -> void:
 	if ondate:
 		ondate.stop()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	hud.show_message("SIETE TUTTI A TERRA!\n\nArrivati all'ondata %d con %d punti\n\nPremi INVIO per tornare al menu" % [wave, score])
+	_show_end("SIETE TUTTI A TERRA!", wave)
 
 
 # ---------------------------------------------------------------- test automatici
@@ -353,7 +445,7 @@ func _parse_debug_args() -> void:
 			_auto_weapon = int(a.substr(9))
 		elif a in ["--overview", "--desk", "--door", "--ramp", "--wall", "--back", "--garage"]:
 			_pose = a
-		elif a in ["--front", "--prone", "--guida", "--vola"]:   # visuale frontale / sdraiato / veicoli
+		elif a in ["--front", "--prone", "--guida", "--vola", "--forziere", "--classifica"]:   # visuale frontale / sdraiato / veicoli / forziere / classifica
 			_extra.append(a)
 
 
@@ -365,6 +457,15 @@ func _apply_pose() -> void:
 		player._prone = true
 	if "--guida" in _extra:
 		player.enter_vehicle(macchinina)
+	if "--forziere" in _extra:
+		_spawn_chest.call_deferred()
+	if "--classifica" in _extra:
+		# classifica finta di fine partita (per lo screenshot)
+		game_over = true
+		hud.show_scoreboard("SIETE TUTTI A TERRA!", [
+			{"peer": 1, "name": "Mauro", "char": 0, "points": 1230, "damage": 123.0, "kills": 11, "assists": 3, "heads": 4, "deaths": 1},
+			{"peer": 2, "name": "Matteo", "char": 3, "points": 980, "damage": 98.0, "kills": 7, "assists": 6, "heads": 2, "deaths": 1}],
+			1, "Arrivati all'ondata 7  ·  punti di squadra 2210\n\nPremi INVIO per tornare al menu")
 	if "--vola" in _extra:
 		# in volo a un metro da terra sopra la rampa, verso ovest lungo il lato della porta
 		aeroplanino.global_position = Vector3(0.25, 0.95, 1.4) * Config.S

@@ -4,7 +4,7 @@ extends StaticBody3D
 ## Ha una capsula sul livello dei nemici, così i colpi lo prendono: take_hit avvisa la rete, che manda
 ## il danno al suo proprietario (in testa vale Config.HEADSHOT_MULT volte). Sopra la testa c'è il nome.
 
-signal hit(peer_id: int, amount: float)
+signal hit(peer_id: int, amount: float, head: bool)
 
 const Config := preload("res://scripts/config.gd")
 const Characters := preload("res://scripts/data/characters.gd")
@@ -158,7 +158,7 @@ func take_hit(damage: float, pos_hit: Vector3, _dir: Vector3) -> bool:
 	# la testa parte dal collo: 1,48 m in piedi, 0,4 più in basso accovacciato; sdraiati non conta
 	var neck := (1.48 - (0.4 if _crouch else 0.0)) * _scale
 	var head := _prone_k < 0.5 and pos_hit.y - global_position.y > neck
-	hit.emit(peer_id, damage * (Config.HEADSHOT_MULT if head else 1.0))
+	hit.emit(peer_id, damage * (Config.HEADSHOT_MULT if head else 1.0), head)
 	return head
 
 

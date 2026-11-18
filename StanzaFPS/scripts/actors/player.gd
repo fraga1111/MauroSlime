@@ -2,8 +2,12 @@ extends CharacterBody3D
 ## Giocatore, sempre in TERZA PERSONA. Le statistiche arrivano dal personaggio scelto.
 ## Comandi (tasti in game/input_setup.gd): WASD, Shift o tasto laterale del mouse corri, Spazio salta,
 ## B super salto, Ctrl/C accovacciati (premuto mentre corri = scivolata), Z a terra a strisciare,
-## V visuale frontale, click sinistro spara, click destro mira, R ricarica, Esc libera il mouse,
-## 1-4 · rotellina · Q cambia arma, E sali/scendi dalla macchinina o dall'aeroplanino (actors/veicolo.gd).
+## V visuale frontale, click sinistro spara, R ricarica, Esc libera il mouse,
+## E sali/scendi dalla macchinina o dall'aeroplanino (actors/veicolo.gd).
+## ZOOM (click destro): un click = zoom FORTE (se lo tieni premuto, al rilascio si toglie; se clicchi e
+## lasci, resta finché non clicchi ancora); doppio click veloce = zoom LEGGERO (resta). Correre lo toglie.
+## ARMI: si parte con quella scelta nel menu; il forziere di fine ondata (game/forziere.gd) ne dà una
+## seconda (give_weapon). Con 1 / 2, la rotellina o Q si passa dall'una all'altra.
 ## Tutti i personaggi hanno le stesse abilità (config.gd) e le stesse armi (data/weapons.gd).
 ## Sul veicolo l'omino diventa figlio del veicolo, seduto; guida il veicolo (i comandi li legge lui).
 ##
@@ -65,7 +69,10 @@ var speed_mult := 1.0
 var jump_mult := 1.0
 var spawn_point := Vector3.ZERO
 var aiming := false
+var zoom := 0                    # 0 = niente, 1 = zoom leggero (doppio click destro), 2 = zoom forte
 var current_spread := 0.0
+## Armi che porti (indici in Weapons.LIST): al massimo Config.MAX_WEAPONS
+var owned: Array[int] = []
 
 var _rig: FollowCamera
 var _model: CharacterModel
@@ -98,6 +105,7 @@ var _vehicle: Veicolo = null     # veicolo su cui sei seduto (null = a piedi)
 var _home_parent: Node           # dove torna l'omino quando scende
 var _hint := ""
 var _hint_t := 0.0
+var _zoom_press_t := -10.0       # quando hai premuto l'ultima volta il click destro (secondi)
 
 
 func _ready() -> void:
@@ -106,6 +114,7 @@ func _ready() -> void:
 	for w in Weapons.LIST:
 		_w_mag.append(int(w["mag"]))
 		_w_reserve.append(int(w["reserve"]))
+	owned = [start_weapon]
 	_load_weapon(start_weapon)
 
 	collision_layer = Config.LAYER_PLAYER
@@ -227,13 +236,42 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("front_view"):
 		set_front_view(not _front_view)
 		return
-	# l'arma è quella scelta nel menu e resta quella per tutta la partita (niente 1-4, rotellina o Q)
+	if event.is_action("aim") and event is InputEventMouseButton and (captured or auto_test):
+		_zoom_click(event.is_pressed())
+		return
+	# armi: quella del menu + quella del forziere (1 / 2, rotellina o Q)
+	if owned.size() > 1 and (captured or auto_test):
+		if event.is_action_pressed("weapon_next"):
+			switch_weapon(owned[(owned.find(weapon) + 1) % owned.size()])
+			return
+		if event.is_action_pressed("weapon_1"):
+			switch_weapon(owned[0])
+			return
+		if event.is_action_pressed("weapon_2"):
+			switch_weapon(owned[1])
+			return
 	if event is InputEventMouseMotion and captured:
-		var sens := mouse_sensitivity * (0.6 if aiming else 1.0)
+		var zk: float = [1.0, 0.65, 0.35][zoom] if aiming else 1.0
+		var sens := mouse_sensitivity * zk
 		var rel: Vector2 = event.relative
 		_yaw = wrapf(_yaw - rel.x * sens, -PI, PI)
 		_pitch = clampf(_pitch - rel.y * sens, -PITCH_LIMIT, PITCH_LIMIT)
 		_aim_camera()
+
+
+## Click destro premuto / lasciato: decide lo zoom (vedi in cima al file; tempi in config.gd).
+func _zoom_click(pressed: bool) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if pressed:
+		if now - _zoom_press_t < Config.ZOOM_DOUBLE_CLICK:
+			zoom = 1                   # doppio click: zoom leggero
+		elif zoom == 0:
+			zoom = 2                   # click: zoom forte
+		else:
+			zoom = 0                   # già con lo zoom: click = via lo zoom
+		_zoom_press_t = now
+	elif zoom == 2 and now - _zoom_press_t > Config.ZOOM_HOLD:
+		zoom = 0                       # era tenuto premuto: lasciando si toglie
 
 
 ## Visuale frontale: la telecamera gira davanti all'omino e lo guarda in faccia (tasto V).
@@ -273,7 +311,9 @@ func _physics_process(delta: float) -> void:
 	if captured:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var crouch := captured and Input.is_action_pressed("crouch")
-	aiming = captured and Input.is_action_pressed("aim") and _reload_t <= 0.0
+	if captured and Input.is_action_just_pressed("sprint"):
+		zoom = 0                         # correre toglie lo zoom
+	aiming = captured and zoom > 0 and _reload_t <= 0.0
 	var on_floor := is_on_floor()
 
 	# a terra / in piedi (Z): ti sdrai solo se c'è posto, e ti rialzi solo se sopra è libero
@@ -364,6 +404,7 @@ func _physics_process(delta: float) -> void:
 	_model.rotation.x = -PI / 2 * _prone_k + 0.4 * _slide_k
 	_model.position = Vector3(0.0, _step_offset + 0.13 * _prone_k, Config.PLAYER_PRONE_LENGTH / 2.0 * _prone_k)
 	_rig.aiming = aiming
+	_rig.zoom = zoom if aiming else 0
 	_rig.sprinting = sprint and Vector2(velocity.x, velocity.z).length() > BASE_WALK * speed_mult
 	_rig.anchor_height = _anchor_height()
 	_aim_camera()
@@ -409,6 +450,7 @@ func enter_vehicle(v: Veicolo) -> void:
 	_slide_k = 0.0
 	_reload_t = 0.0
 	aiming = false
+	zoom = 0
 	_height = STAND_HEIGHT
 	_update_shape()
 	_col.disabled = true
@@ -597,6 +639,25 @@ func _shoot() -> void:
 	_flash_t = 0.045
 
 
+## Arma nuova dal forziere (game/forziere.gd): piena di colpi. Se hai già Config.MAX_WEAPONS armi,
+## sostituisce quella che hai in mano. Ritorna il nome dell'arma lasciata ("" se non ne lasci nessuna).
+func give_weapon(i: int) -> String:
+	if owned.has(i):
+		switch_weapon(i)
+		return ""
+	_w_mag[i] = int(Weapons.LIST[i]["mag"])
+	_w_reserve[i] = int(Weapons.LIST[i]["reserve"])
+	var dropped := ""
+	if owned.size() < Config.MAX_WEAPONS:
+		owned.append(i)
+	else:
+		var k := owned.find(weapon)
+		dropped = String(Weapons.LIST[weapon]["name"])
+		owned[k] = i
+	switch_weapon(i)
+	return dropped
+
+
 ## Cambia arma (i colpi rimasti in quella vecchia restano lì per quando la riprendi).
 func switch_weapon(i: int) -> void:
 	if i == weapon or not alive:
@@ -625,7 +686,16 @@ func _load_weapon(i: int) -> void:
 	kick_mult = w["kick"]
 	mag = _w_mag[i]
 	reserve = _w_reserve[i]
-	weapon_changed.emit(String(w["name"]))
+	weapon_changed.emit(weapon_label())
+
+
+## Nome dell'arma in mano per l'interfaccia, con l'altra arma se ce l'hai ("SPILLATRICE   ·  Q: TELEFONO").
+func weapon_label() -> String:
+	var t := String(Weapons.LIST[weapon]["name"])
+	for i in owned:
+		if i != weapon:
+			t += "   ·  Q: %s" % Weapons.LIST[i]["name"]
+	return t
 
 
 func _set_flash_color() -> void:
@@ -703,6 +773,7 @@ func take_damage(amount: float) -> void:
 	if hp <= 0.0:
 		exit_vehicle()
 		alive = false
+		zoom = 0
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		var tw := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 		tw.tween_property(_model, "rotation:x", PI / 2, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)

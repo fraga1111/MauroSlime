@@ -39,6 +39,8 @@ var coop := false                             # true = tutti insieme contro le o
 var my_info := {}
 ## Il giocatore locale (actors/player.gd), impostato da main.gd quando la partita parte
 var player: Node = null
+## game/punteggi.gd: chi mi colpisce si prende i punti (danni) e l'uccisione
+var punteggi: Node = null
 
 var _infos := {}                              # id -> info degli altri
 var _avatars := {}                            # id -> Avatar
@@ -139,6 +141,21 @@ func player_count() -> int:
 	return _avatars.size() + 1
 
 
+## Presentazione dell'altro giocatore id ({"name", "char", ...}); vuota se non lo conosco.
+func info_of(id: int) -> Dictionary:
+	return _infos.get(id, {})
+
+
+## Personaggi usati da tutti i giocatori (io compreso): i nemici delle ondate non li usano.
+func used_chars() -> Array:
+	var out := []
+	if my_info.has("char"):
+		out.append(int(my_info["char"]))
+	for info in _infos.values():
+		out.append(int(info.get("char", -1)))
+	return out
+
+
 # ---------------------------------------------------------------- collegamenti
 
 func _on_peer_connected(id: int) -> void:
@@ -211,13 +228,16 @@ func _shot(to: Vector3, normal: Vector3, world: bool) -> void:
 		av.show_shot(to, normal, world)
 
 
-## Qualcuno mi ha colpito.
+## Qualcuno mi ha colpito (head = in testa).
 @rpc("any_peer", "reliable")
-func _hit(amount: float) -> void:
+func _hit(amount: float, head := false) -> void:
 	if player == null or not player.alive:
 		return
 	var from := multiplayer.get_remote_sender_id()
+	var before: float = player.hp
 	player.take_damage(amount)
+	if punteggi:
+		punteggi.record_damage(from, "p%d" % multiplayer.get_unique_id(), before - float(player.hp), head, not player.alive)
 	if not player.alive:
 		var who: String = _infos.get(from, {}).get("name", "qualcuno")
 		message.emit("Ti ha steso %s!" % who)
@@ -258,9 +278,9 @@ func on_player_fired(to: Vector3, normal: Vector3, world: bool) -> void:
 		_shot.rpc(to, normal, world)
 
 
-func _on_avatar_hit(id: int, amount: float) -> void:
+func _on_avatar_hit(id: int, amount: float, head: bool) -> void:
 	if online and not coop:
-		_hit.rpc_id(id, amount * Config.PVP_DAMAGE)
+		_hit.rpc_id(id, amount * Config.PVP_DAMAGE, head)
 
 
 ## Omini degli altri giocatori (li usano i nemici in co-op come bersagli).

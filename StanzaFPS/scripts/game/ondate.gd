@@ -10,11 +10,12 @@ extends Node
 ##                (il giocatore più vicino, anche gli amici) e manda tutto agli altri 20 volte al secondo.
 ##                Gli altri hanno solo copie dei nemici (puppet): i loro colpi vengono mandati a chi ospita.
 ##                Chi muore resta a terra fino alla fine dell'ondata; se cadono tutti, la partita finisce.
+## I PUNTI sono i danni fatti ai nemici: li conta game/punteggi.gd (anche uccisioni e assist di ognuno).
+## I nemici non usano mai i personaggi dei giocatori (né il tuo né, in co-op, quelli degli amici).
 ## Questo nodo si chiama sempre "Ondate" ed è figlio di Main: le chiamate rpc cercano lo stesso percorso.
 
 signal wave_started(wave: int, boss: bool)
 signal wave_cleared(wave: int)
-signal score_changed(score: int)
 signal enemies_changed(left: int)
 signal all_down(wave: int, score: int)        # co-op: tutti i giocatori a terra, partita finita
 
@@ -26,12 +27,16 @@ const Nemico := preload("res://scripts/actors/nemico.gd")
 
 var player                       # il giocatore di questo computer
 var rete                         # game/rete.gd (co-op: gli omini degli amici sono bersagli anche loro)
-var player_char := -1            # il personaggio del giocatore (i nemici preferiscono gli altri)
+var punteggi                     # game/punteggi.gd: danni, uccisioni e assist di ogni giocatore
+var player_char := -1            # il personaggio del giocatore (i nemici non lo usano mai)
 var spawn_parent: Node3D         # dove vengono aggiunti i nemici
 var net := false                 # co-op online
 var is_host := true              # offline o chi ospita: comanda lui
 var wave := 0
-var score := 0
+## Punti di tutta la squadra (somma dei danni fatti, game/punteggi.gd)
+var score: int:
+	get:
+		return punteggi.total_points() if punteggi else 0
 var alive := 0
 var running := false
 
@@ -82,6 +87,8 @@ func _process(delta: float) -> void:
 			_send_states()
 		if wave >= 1 and targets().is_empty():
 			running = false
+			if punteggi:
+				punteggi.flush()          # la classifica finale arriva a tutti prima della fine
 			all_down.emit(wave, score)
 			_all_down.rpc(wave, score)
 
@@ -123,6 +130,17 @@ func send_hit(id: int, amount: float, head: bool) -> void:
 	_hit.rpc_id(1, id, amount, head)
 
 
+## Il mio id di rete (1 offline e per chi ospita): serve per sapere chi ha fatto i danni.
+func my_id() -> int:
+	return multiplayer.get_unique_id() if net else 1
+
+
+## Un nemico ha preso danno da attacker (nemico.gd apply_damage, solo su chi comanda).
+func enemy_damaged(attacker: int, id: int, amount: float, head: bool, killed: bool) -> void:
+	if punteggi:
+		punteggi.record_damage(attacker, "e%d" % id, amount, head, killed)
+
+
 # ---------------------------------------------------------------- ondate (solo chi comanda)
 
 func _start_wave() -> void:
@@ -137,7 +155,7 @@ func _start_wave() -> void:
 	enemies_changed.emit(left())
 	if net:
 		_wave_start.rpc(wave, boss)
-		_hud.rpc(wave, left(), score)
+		_hud.rpc(wave, left())
 
 
 func _spawn(boss: bool) -> void:
@@ -172,13 +190,24 @@ func _spawn(boss: bool) -> void:
 		_spawn_puppet.rpc(_puppet_info(e))
 
 
-## Un personaggio a caso tra quelli del menu, se possibile diverso dal tuo.
+## Un personaggio a caso tra quelli del menu, ma MAI uno usato da un giocatore (il tuo e, in co-op,
+## quelli degli amici). Solo se i giocatori li usano tutti si prende uno qualsiasi tranne il tuo.
 func _pick_char() -> int:
 	var n := Characters.LIST.size()
-	var i := randi() % n
-	if i == player_char and n > 1:
-		i = (i + 1 + randi() % (n - 1)) % n
-	return i
+	var used := [player_char]
+	if net and rete:
+		used.append_array(rete.used_chars())
+	var free := []
+	for i in n:
+		if not used.has(i):
+			free.append(i)
+	if free.is_empty():
+		for i in n:
+			if i != player_char:
+				free.append(i)
+	if free.is_empty():
+		return randi() % n
+	return int(free[randi() % free.size()])
 
 
 ## Punto di comparsa a caso tra quelli di room.gd, lontano da tutti i giocatori.
@@ -203,15 +232,13 @@ func _pick_spawn() -> Vector3:
 	return pos + Vector3(randf_range(-1.0, 1.0), 0.3, randf_range(-1.0, 1.0))
 
 
-func _on_died(points: int, e: Nemico) -> void:
+func _on_died(e: Nemico) -> void:
 	_enemies.erase(e.net_id)
 	alive -= 1
-	score += points
-	score_changed.emit(score)
 	enemies_changed.emit(left())
 	if net:
 		_died.rpc(e.net_id)
-		_hud.rpc(wave, left(), score)
+		_hud.rpc(wave, left())
 	if running and left() <= 0:
 		wave_cleared.emit(wave)
 		if net:
@@ -244,7 +271,7 @@ func _sync_request() -> void:
 	var who := multiplayer.get_remote_sender_id()
 	for id in _enemies:
 		_spawn_puppet.rpc_id(who, _puppet_info(_enemies[id]))
-	_hud.rpc_id(who, wave, left(), score)
+	_hud.rpc_id(who, wave, left())
 
 
 @rpc("authority", "reliable")
@@ -292,10 +319,8 @@ func _died(id: int) -> void:
 
 
 @rpc("authority", "reliable")
-func _hud(w: int, n: int, s: int) -> void:
+func _hud(w: int, n: int) -> void:
 	wave = w
-	score = s
-	score_changed.emit(s)
 	enemies_changed.emit(n)
 
 
@@ -329,4 +354,4 @@ func _hit(id: int, amount: float, head: bool) -> void:
 		return
 	var e: Nemico = _enemies.get(id)
 	if e and is_instance_valid(e):
-		e.apply_damage(clampf(amount, 0.0, 100.0), head)
+		e.apply_damage(clampf(amount, 0.0, 100.0), head, Vector3.ZERO, multiplayer.get_remote_sender_id())

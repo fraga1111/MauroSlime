@@ -21,6 +21,7 @@ var target: CharacterBody3D      # l'omino da seguire
 var yaw := 0.0                   # dove guarda (radianti)
 var pitch := 0.0
 var aiming := false
+var zoom := 2                    # mirando: 2 = zoom forte, 1 = zoom leggero (player.gd)
 var sprinting := false           # correndo: FOV un po' più largo
 var front := false               # visuale frontale: la telecamera gira davanti all'omino e lo guarda
 var anchor_height := 1.45        # altezza sopra i piedi del punto sicuro (centro della "testa" della capsula)
@@ -99,8 +100,9 @@ func _process(delta: float) -> void:
 	if driving:
 		want_reach = drive_reach
 	_reach = lerpf(_reach, lerpf(want_reach, Config.TP_FRONT_DISTANCE, fk), k)
-	var want_fov := Config.TP_ADS_FOV if aiming else (Config.TP_SPRINT_FOV if sprinting else Config.TP_FOV)
-	camera.fov = lerpf(camera.fov, lerpf(want_fov, Config.TP_FOV, fk), 1.0 - exp(-delta * 6.0))
+	var ads_fov := Config.TP_ADS_LIGHT_FOV if zoom == 1 else Config.TP_ADS_FOV
+	var want_fov := ads_fov if aiming else (Config.TP_SPRINT_FOV if sprinting else Config.TP_FOV)
+	camera.fov = lerpf(camera.fov, lerpf(want_fov, Config.TP_FOV, fk), 1.0 - exp(-delta * 9.0))
 	# visuale frontale: la telecamera ruota di mezzo giro intorno all'omino, senza spalla, poco dall'alto
 	var cyaw := yaw + PI * fk
 	var cpitch := lerpf(pitch, -0.18 - pitch * 0.25, fk)

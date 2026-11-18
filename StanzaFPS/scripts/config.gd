@@ -97,9 +97,19 @@ const ENEMY_RANGE := 45.0         # da quanto lontano ti spara (metri di gioco)
 const ENEMY_KEEP_DIST := 9.0      # se ti vede si ferma a questa distanza e spara
 const ENEMY_HIT_RADIUS := 0.45    # quanto vicino al tuo petto deve passare il colpo per prenderti
 const ENEMY_TRACER := Color(1.0, 0.3, 0.2)   # colore dei colpi dei nemici (se l'arma non ne ha uno)
+const ENEMY_AURA_COLOR := Color(1.0, 0.08, 0.04, 0.9)   # alone rosso dei nemici (gli amici non ce l'hanno)
+const ENEMY_AURA_GROW := 0.035    # quanto l'alone sporge dall'omino (metri di gioco)
 const BOSS_SCALE := 1.6
 const BOSS_HP_MULT := 5.0
 const BOSS_DAMAGE_MULT := 1.5
+
+# --- punti e classifica (game/punteggi.gd), storico (game/storico.gd) ---------------
+const POINTS_PER_DAMAGE := 10.0   # punti = danni fatti x questo (a nemici o, tutti contro tutti, a giocatori)
+
+# --- forziere a fine ondata (game/forziere.gd): una seconda arma ------------------------
+const CHEST_OPEN_DELAY := 1.2     # secondi dopo la fine dell'ondata prima che il forziere si apra
+const CHEST_PICK_RADIUS := 1.6    # quanto vicino devi passare per prendere l'arma (metri di gioco)
+const MAX_WEAPONS := 2            # armi che porti insieme (1/2, rotellina o Q per cambiare)
 
 # --- CO-OP online (game/ondate.gd con net = true): ondate contro tutti i giocatori insieme -----
 const COOP_EXTRA_PER_PLAYER := 0.5   # nemici in più per ogni giocatore oltre al primo (0,5 = +50%)
@@ -113,7 +123,10 @@ const SPAWN_SPREAD := 1.2         # distanza tra i punti di comparsa dei giocato
 
 # --- telecamera in terza persona (actors/follow_camera.gd), metri di gioco -------
 const TP_FOV := 70.0
-const TP_ADS_FOV := 52.0          # mirando (click destro)
+const TP_ADS_FOV := 24.0          # ZOOM FORTE: click destro (tenuto, oppure un click e resta)
+const TP_ADS_LIGHT_FOV := 46.0    # ZOOM LEGGERO: doppio click destro veloce (resta finché non clicchi ancora)
+const ZOOM_DOUBLE_CLICK := 0.3    # due click destri entro questi secondi = doppio click
+const ZOOM_HOLD := 0.35           # click destro tenuto più di così: al rilascio lo zoom si toglie
 const TP_DISTANCE := 3.4          # distanza dietro l'omino
 const TP_ADS_DISTANCE := 1.7
 const TP_SHOULDER := 0.65         # spostamento a destra (visuale da sopra la spalla)
