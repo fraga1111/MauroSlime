@@ -51,6 +51,7 @@ func _tick() -> void:
 	match step:
 		0:
 			if frames == 3:
+				main.nemici = false      # niente ondate di nemici durante il test
 				main.start_game(0)
 				player = main.player
 				player.auto_test = true

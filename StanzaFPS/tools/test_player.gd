@@ -64,6 +64,7 @@ func _process(_delta: float) -> bool:
 	match phase:
 		"avvio":
 			if frames == 2:
+				main.nemici = false      # niente ondate di nemici durante il test
 				main.start_game(0)        # al primo frame la scena è pronta (menu visibile)
 				player = main.player
 				player.auto_test = true

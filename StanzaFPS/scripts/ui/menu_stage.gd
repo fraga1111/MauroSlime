@@ -3,7 +3,7 @@ extends Node3D
 ## che li guarda e il menu a schede (ui/menu.gd). Quando si preme GIOCA emette start_game.
 
 signal start_game(index: int, weapon: int, stile: String)
-signal host_game(index: int, weapon: int, stile: String, player_name: String)
+signal host_game(index: int, weapon: int, stile: String, player_name: String, coop: bool)
 signal join_game(index: int, weapon: int, stile: String, player_name: String, ip: String)
 
 const Config := preload("res://scripts/config.gd")
@@ -67,9 +67,9 @@ func _ready() -> void:
 	_menu.weapon_selected.connect(_on_weapon_selected)
 	_menu.style_changed.connect(_on_style_changed)
 	_menu.start_game.connect(_on_start)
-	_menu.host_game.connect(func(i: int, w: int, st: String, n: String) -> void:
+	_menu.host_game.connect(func(i: int, w: int, st: String, n: String, coop: bool) -> void:
 		_remember(i, w)
-		host_game.emit(i, w, st, n))
+		host_game.emit(i, w, st, n, coop))
 	_menu.join_game.connect(func(i: int, w: int, st: String, n: String, ip: String) -> void:
 		_remember(i, w)
 		join_game.emit(i, w, st, n, ip))

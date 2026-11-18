@@ -1,6 +1,6 @@
 extends RefCounted
-## ARMI. Tutti i personaggi hanno le stesse armi e possono cambiarle in partita
-## (tasti 1, 2, 3, 4 · rotellina del mouse · Q = arma successiva). Nel menu si sceglie quella di partenza.
+## ARMI. Tutti i personaggi possono usare tutte le armi: si sceglie nel menu e resta quella
+## per tutta la partita (in partita non si cambia).
 ## Per aggiungere un'arma: copia un blocco { ... } e fai il modello in actors/gun_models.gd.
 ##
 ## name        nome a schermo

@@ -50,7 +50,7 @@ const RAMP_RUN := 1.0
 
 # --- punti di comparsa (metri reali) -----------------------------------------
 const PLAYER_SPAWN := Vector3(-0.6, 0.02, 1.3)
-# per ora non usati: i nemici sono in archivio_nemici/ (torneranno più avanti)
+# nemici della partita offline (game/ondate.gd)
 const ENEMY_SPAWNS := [
 	Vector3(-1.15, 0.05, -1.6),
 	Vector3(1.17, 0.05, -1.6),
@@ -116,6 +116,7 @@ var _screens := {}
 func build(nav_root: Node3D, other_root: Node3D) -> void:
 	rng.seed = 2026
 	_screens = {"desktop": Textures.screen_desktop(), "code": Textures.screen_code(), "sheet": Textures.screen_sheet()}
+	zona = "ufficio"
 	root = other_root
 	_ceiling_and_lights()
 	root = nav_root
@@ -130,6 +131,7 @@ func build(nav_root: Node3D, other_root: Node3D) -> void:
 	_coat_rack()
 	_dracena(Vector3(0.55, 0, 0.98))
 	_ramp()
+	finish()           # unisce i pezzi in poche mesh (vedi kit.gd)
 
 
 # ============================================================ STRUTTURA

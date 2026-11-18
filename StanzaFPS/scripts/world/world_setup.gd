@@ -1,6 +1,5 @@
 extends RefCounted
-## Ambiente (luce generale, tonalità) e mesh di navigazione dei nemici
-## (quest'ultima per ora non viene usata: i nemici sono in archivio_nemici/).
+## Ambiente (luce generale, tonalità) e mesh di navigazione dei nemici (partita offline, actors/nemico.gd).
 
 const Config := preload("res://scripts/config.gd")
 
@@ -13,15 +12,14 @@ static func add_environment(parent: Node) -> void:
 	env.ambient_light_color = Color(0.85, 0.88, 1.0)
 	env.ambient_light_energy = 0.45
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.ssao_enabled = true
+	env.ssao_enabled = RenderingServer.get_current_rendering_method() == "forward_plus"   # il renderer Mobile non ha SSAO
 	env.glow_enabled = true
 	var we := WorldEnvironment.new()
 	we.environment = env
 	parent.add_child(we)
 
 
-## NON USATA PER ORA (servirà quando torneranno i nemici).
-## Calcola dove possono camminare gli slime, partendo dalle collisioni dei figli di "nav".
+## Calcola dove possono camminare i nemici, partendo dalle collisioni dei figli di "nav".
 ## Pendenze oltre agent_max_slope e gradini oltre agent_max_climb (metri di gioco) non sono percorribili.
 static func bake_navigation(nav: NavigationRegion3D) -> void:
 	var nm := NavigationMesh.new()

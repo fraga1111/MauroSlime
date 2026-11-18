@@ -19,6 +19,12 @@ var _bars: Array[ColorRect] = []
 var _msg_t := 0.0
 var _hit_t := 0.0
 var _gap := 8.0
+var _fps: Label                  # in alto a sinistra: fotogrammi al secondo (F3 lo nasconde)
+var _fps_t := 0.0
+var _wave: Label                 # in alto a destra (solo offline): ondata, nemici rimasti, punti
+var _wave_n := 0
+var _left := 0
+var _score := 0
 
 
 func _ready() -> void:
@@ -61,6 +67,13 @@ func _ready() -> void:
 	var title := _label(20, HORIZONTAL_ALIGNMENT_LEFT, VERTICAL_ALIGNMENT_TOP)
 	title.text = "MauroSlime  v0.4 · bozza · %s" % preload("res://scripts/game/rete.gd").version()
 	title.modulate = Color(1, 1, 1, 0.6)
+	_fps = _label(18, HORIZONTAL_ALIGNMENT_LEFT, VERTICAL_ALIGNMENT_TOP)
+	_fps.offset_top = 46.0
+	_fps.modulate = Color(1, 1, 1, 0.6)
+
+	_wave = _label(26, HORIZONTAL_ALIGNMENT_RIGHT, VERTICAL_ALIGNMENT_TOP)
+	_wave.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+	_wave.visible = false
 
 	set_health(100.0)
 	set_ammo(30, 180, false)
@@ -124,6 +137,10 @@ func _label(font_size: int, h: HorizontalAlignment, v: VerticalAlignment) -> Lab
 
 
 func _process(delta: float) -> void:
+	_fps_t -= delta
+	if _fps_t <= 0.0:
+		_fps_t = 0.5
+		_fps.text = "%d FPS" % Engine.get_frames_per_second()
 	if absf(_hp_shown - _hp_target) > 0.05:
 		_hp_shown = lerpf(_hp_shown, _hp_target, clampf(delta * 10.0, 0.0, 1.0))
 		_draw_health()
@@ -183,7 +200,7 @@ func set_ammo(mag: int, reserve: int, reloading: bool) -> void:
 	_ammo.add_theme_color_override("font_color", Color(1, 0.8, 0.3) if mag <= 5 else Color.WHITE)
 
 
-## Nome dell'arma in mano, sopra le munizioni (cambia con 1-4, rotellina o Q).
+## Nome dell'arma in mano, sopra le munizioni (quella scelta nel menu, fissa per tutta la partita).
 func set_weapon(weapon_name: String) -> void:
 	_weapon.text = weapon_name
 
@@ -206,6 +223,27 @@ func set_driving(on: bool) -> void:
 	_weapon.visible = not on
 
 
+## Partita offline (game/ondate.gd): ondata, nemici ancora da battere e punteggio.
+func set_wave(wave: int) -> void:
+	_wave_n = wave
+	_draw_wave()
+
+
+func set_enemies_left(n: int) -> void:
+	_left = n
+	_draw_wave()
+
+
+func set_score(score: int) -> void:
+	_score = score
+	_draw_wave()
+
+
+func _draw_wave() -> void:
+	_wave.visible = true
+	_wave.text = "ONDATA %d\nNemici: %d\nPunti: %d" % [_wave_n, _left, _score]
+
+
 func show_message(text: String, duration := 0.0) -> void:
 	_msg.text = text
 	_msg_t = duration
@@ -219,3 +257,8 @@ func hit(killed: bool) -> void:
 
 func damage_flash() -> void:
 	_dmg.color.a = 0.35
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
+		_fps.visible = not _fps.visible

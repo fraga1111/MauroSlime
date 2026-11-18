@@ -62,8 +62,51 @@ const PLANE_ACCEL := 9.0
 const PLANE_TURN := 1.6           # quanto in fretta gira verso dove punti (radianti al secondo)
 const PLANE_CAM_DISTANCE := 9.0   # telecamera dietro l'aeroplanino
 
+# --- partita OFFLINE: ondate di nemici (game/ondate.gd) -----------------------------
+# I nemici sono gli omini del menu (data/characters.gd) che ti sparano (actors/nemico.gd).
+# Ogni ondata ce ne sono di più e sono più forti: valore = BASE + ondata * PER_ONDATA (con un limite).
+const WAVE_FIRST_DELAY := 3.0     # secondi prima della prima ondata
+const WAVE_NEXT_DELAY := 5.0      # pausa tra un'ondata e l'altra
+const WAVE_SPAWN_INTERVAL := 1.2  # secondi tra un nemico e il successivo
+const WAVE_BASE_COUNT := 2        # nemici nell'ondata = BASE + ondata * PER_WAVE
+const WAVE_COUNT_PER_WAVE := 1
+const WAVE_MAX_ALIVE := 7         # mai più di tanti nemici vivi insieme (gli altri aspettano)
+const WAVE_DESK_FROM := 3         # da quale ondata compaiono nemici sopra le scrivanie
+const WAVE_MIN_SPAWN_DIST := 18.0 # non compaiono più vicini di così al giocatore (metri di gioco)
+const WAVE_CLEAR_HEAL := 35.0     # vita restituita a fine ondata
+const WAVE_CLEAR_CLIPS := 1       # caricatori in più per ogni arma a fine ondata
+const WAVE_BOSS_EVERY := 5        # ogni tante ondate arriva un CAPO (più grosso, tanta vita)
+
+const ENEMY_HP := 6.0             # vita (i colpi delle armi fanno 1-3)
+const ENEMY_HP_PER_WAVE := 1.5
+const ENEMY_SPEED := 4.0          # metri di gioco al secondo
+const ENEMY_SPEED_PER_WAVE := 0.3
+const ENEMY_MAX_SPEED := 8.0
+const ENEMY_DAMAGE := 3.0         # danno di ogni colpo che ti prende (vita 100)
+const ENEMY_DAMAGE_PER_WAVE := 0.5
+const ENEMY_MAX_DAMAGE := 9.0
+const ENEMY_FIRE_DELAY := 0.55    # secondi tra un colpo e l'altro della raffica
+const ENEMY_FIRE_DELAY_MIN := 0.18
+const ENEMY_BURST := 3            # colpi per raffica (+1 ogni 3 ondate)...
+const ENEMY_BURST_PAUSE := 1.6    # ...poi si ferma un attimo (meno con le ondate)
+const ENEMY_SPREAD := 0.09        # imprecisione in radianti (più basso = mira meglio)
+const ENEMY_SPREAD_MIN := 0.025
+const ENEMY_REACTION := 0.9       # secondi prima di sparare quando ti vede
+const ENEMY_REACTION_MIN := 0.25
+const ENEMY_RANGE := 45.0         # da quanto lontano ti spara (metri di gioco)
+const ENEMY_KEEP_DIST := 9.0      # se ti vede si ferma a questa distanza e spara
+const ENEMY_HIT_RADIUS := 0.45    # quanto vicino al tuo petto deve passare il colpo per prenderti
+const ENEMY_TRACER := Color(1.0, 0.3, 0.2)   # colore dei colpi dei nemici (se l'arma non ne ha uno)
+const BOSS_SCALE := 1.6
+const BOSS_HP_MULT := 5.0
+const BOSS_DAMAGE_MULT := 1.5
+
+# --- CO-OP online (game/ondate.gd con net = true): ondate contro tutti i giocatori insieme -----
+const COOP_EXTRA_PER_PLAYER := 0.5   # nemici in più per ogni giocatore oltre al primo (0,5 = +50%)
+const COOP_SEND_RATE := 20.0         # aggiornamenti al secondo delle posizioni dei nemici
+
 # --- multiplayer (game/rete.gd) ---------------------------------------------------
-const PVP_DAMAGE := 5.0           # danno a un altro giocatore = danno dell'arma x questo (vita 100)
+const PVP_DAMAGE := 5.0           # (solo TUTTI CONTRO TUTTI) danno a un altro giocatore = danno dell'arma x questo (vita 100)
 const HEADSHOT_MULT := 3.0        # colpo in testa: danno x questo
 const RESPAWN_TIME := 3.0         # secondi a terra prima di rientrare in partita
 const SPAWN_SPREAD := 1.2         # distanza tra i punti di comparsa dei giocatori (metri di gioco)

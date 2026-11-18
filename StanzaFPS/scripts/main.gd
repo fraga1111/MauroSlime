@@ -3,8 +3,9 @@ extends Node3D
 ## Qui non ci sono numeri da bilanciare (stanno in config.gd) né oggetti della stanza (world/room.gd).
 ## Mappa completa del progetto: CLAUDE.md nella cartella principale.
 ##
-## Per ora è una bozza senza nemici (il vecchio codice degli slime è in archivio_nemici/):
-## si entra nella stanza con un omino, in terza persona, e ci si muove e si spara liberamente.
+## GIOCA OFFLINE: arrivano ondate di nemici (gli omini del menu, game/ondate.gd), sempre più difficili.
+## Multiplayer (OSPITA / UNISCITI): in CO-OP le stesse ondate contro tutti i giocatori insieme
+## (comanda chi ospita), oppure TUTTI CONTRO TUTTI senza nemici. Il modo lo sceglie chi ospita.
 
 const Config := preload("res://scripts/config.gd")
 const InputSetup := preload("res://scripts/game/input_setup.gd")
@@ -18,6 +19,7 @@ const Rete := preload("res://scripts/game/rete.gd")
 const Munizioni := preload("res://scripts/game/munizioni.gd")
 const Macchinina := preload("res://scripts/actors/macchinina.gd")
 const Aeroplanino := preload("res://scripts/actors/aeroplanino.gd")
+const Ondate := preload("res://scripts/game/ondate.gd")
 
 var player: Player
 var macchinina: Macchinina        # Opel Agila bianca a terra (E per guidarla)
@@ -27,6 +29,10 @@ var game_over := false
 var _stage: MenuStage
 var rete: Rete                    # multiplayer (game/rete.gd)
 var munizioni: Munizioni          # scatole di graffette a terra
+var ondate: Ondate                # partita offline: ondate di nemici
+var nemici := true                # false = partita offline senza nemici (test automatici, --nonemici)
+var _nav: NavigationRegion3D      # dove possono camminare i nemici (calcolata all'inizio della partita)
+var player_index := 0            # personaggio scelto (serve alle ondate)
 var _pending := []               # client: partita da avviare quando il collegamento riesce
 
 # opzioni da riga di comando, solo per test automatici (vedi CLAUDE.md):
@@ -41,16 +47,23 @@ var _auto_weapon := 0
 var _auto_style := ""
 var _auto_net := ""              # "host" oppure l'IP a cui unirsi
 var _auto_name := ""
+var _auto_coop := true           # --pvp: ospita in TUTTI CONTRO TUTTI
 var _pose := ""
+var _bench := 0.0                # --fps: secondi di misura (stampa FPS e disegni, poi esce)
+var _bench_t := 0.0
+var _bench_frames := 0
 var _extra: Array[String] = []
 
 
 func _ready() -> void:
 	InputSetup.setup()
 	WorldSetup.add_environment(self)
+	_nav = NavigationRegion3D.new()          # la stanza sta qui dentro: i nemici camminano sui suoi mobili
+	_nav.name = "Navigazione"
+	add_child(_nav)
 	var room := Node3D.new()                 # stanza e mobili (tutto ciò che ha una collisione)
 	room.name = "Stanza"
-	add_child(room)
+	_nav.add_child(room)
 	Room.new().build(room, self)
 
 	rete = Rete.new()
@@ -59,6 +72,9 @@ func _ready() -> void:
 	rete.joined.connect(_on_joined)
 	rete.join_failed.connect(_on_join_failed)
 	rete.host_closed.connect(_on_host_closed)
+	rete.coop_known.connect(func() -> void:
+		if player and ondate == null and nemici:
+			_start_waves(player_index))
 	rete.message.connect(func(t: String) -> void:
 		if hud:
 			hud.show_message(t, 3.0))
@@ -72,7 +88,7 @@ func _ready() -> void:
 	_parse_debug_args()
 	var nm := _auto_name if _auto_name != "" else "Giocatore"
 	if _auto_net == "host":
-		host_game(_auto_char, _auto_weapon, _auto_style, nm)
+		host_game(_auto_char, _auto_weapon, _auto_style, nm, _auto_coop)
 	elif _auto_net != "":
 		join_game(_auto_char, _auto_weapon, _auto_style, nm, _auto_net)
 	elif _auto:
@@ -96,8 +112,10 @@ func _net_info(index: int, weapon: int, stile: String, player_name: String) -> D
 
 
 ## OSPITA: apre la partita su questo computer e ci entra subito.
-func host_game(index: int, weapon: int, stile: String, player_name: String) -> void:
+func host_game(index: int, weapon: int, stile: String, player_name: String, coop := true) -> void:
 	rete.my_info = _net_info(index, weapon, stile, player_name)
+	rete.my_info["coop"] = coop
+	rete.coop = coop
 	var err := rete.host()
 	if err != OK:
 		if _stage:
@@ -180,6 +198,45 @@ func start_game(index: int, weapon := 0, stile := "") -> void:
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_apply_pose()
+	player_index = index
+	if nemici and (not rete.online or (rete.coop and rete.is_host)):
+		_start_waves(index)
+	# chi si unisce in CO-OP crea le ondate quando chi ospita gli dice il modo (rete.coop_known)
+
+
+## Partita offline: calcola dove possono camminare i nemici e fa partire le ondate (game/ondate.gd).
+func _start_waves(index: int) -> void:
+	var leader := not rete.online or rete.is_host       # chi comanda i nemici (offline o chi ospita)
+	if leader:
+		WorldSetup.bake_navigation(_nav)
+	ondate = Ondate.new()
+	ondate.name = "Ondate"
+	ondate.net = rete.online
+	ondate.is_host = leader
+	ondate.rete = rete
+	ondate.player = player
+	ondate.player_char = index
+	ondate.spawn_parent = self
+	add_child(ondate)
+	ondate.wave_started.connect(func(w: int, boss: bool) -> void:
+		hud.set_wave(w)
+		hud.show_message("ONDATA %d%s" % [w, "\nARRIVA UN CAPO!" if boss else ""], 2.5))
+	ondate.wave_cleared.connect(func(w: int) -> void:
+		if not player.alive:
+			player.respawn()                          # co-op: chi era a terra rientra
+		else:
+			player.heal(Config.WAVE_CLEAR_HEAL)
+		player.add_clips(Config.WAVE_CLEAR_CLIPS)
+		hud.show_message("ONDATA %d SUPERATA!\n+vita  +graffette" % w, 3.0))
+	ondate.all_down.connect(_on_all_down)
+	ondate.score_changed.connect(hud.set_score)
+	ondate.enemies_changed.connect(hud.set_enemies_left)
+	hud.set_wave(0)
+	hud.set_score(0)
+	if leader:
+		ondate.start()
+	else:
+		hud.show_message("CO-OP: tutti insieme contro le ondate!", 3.0)
 
 
 ## Macchinina e aeroplanino nei loro posti (world/room.gd: CAR_SPOT, PLANE_SPOT). Ognuno ha i suoi:
@@ -199,7 +256,7 @@ func _spawn_vehicles() -> void:
 	add_child(aeroplanino)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _shot_path != "":
 		_shot_frames += 1
 		if _shot_frames == _shot_at:
@@ -207,11 +264,25 @@ func _process(_delta: float) -> void:
 			get_tree().quit()
 	if player:
 		hud.update_crosshair(player.current_spread)
+	if _bench > 0.0 and player:
+		_bench_t += delta
+		_bench_frames += 1
+		if _bench_t >= 2.0 and _bench_frames > 0:     # i primi secondi servono a scaldare
+			var P := Performance
+			print("FPS %.0f  frame %.1f ms  oggetti %d  disegni %d  triangoli %d  nodi %d" % [
+				P.get_monitor(P.TIME_FPS), P.get_monitor(P.TIME_PROCESS) * 1000.0,
+				P.get_monitor(P.RENDER_TOTAL_OBJECTS_IN_FRAME), P.get_monitor(P.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+				P.get_monitor(P.RENDER_TOTAL_PRIMITIVES_IN_FRAME), P.get_monitor(P.OBJECT_NODE_COUNT)])
+			_bench -= _bench_t
+			_bench_t = 0.0
+			if _bench <= 0.0:
+				get_tree().quit()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if game_over and event is InputEventKey and event.pressed:
 		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			rete.leave()
 			get_tree().reload_current_scene()
 
 
@@ -223,6 +294,9 @@ func _on_health_changed(hp: float) -> void:
 
 
 func _on_player_died() -> void:
+	if rete.online and rete.coop:
+		hud.show_message("SEI A TERRA!\n\nRientri alla fine dell'ondata,\nse i tuoi amici resistono", 4.0)
+		return
 	if rete.online:
 		# in multiplayer non si perde: si resta a terra qualche secondo e si rientra
 		hud.show_message("SEI STATO STESO!
@@ -233,7 +307,20 @@ Rientri tra %d secondi" % int(Config.RESPAWN_TIME), Config.RESPAWN_TIME)
 			player.respawn()
 		return
 	game_over = true
-	hud.show_message("SEI FUORI GIOCO!\n\nPremi INVIO per tornare al menu")
+	var stats := ""
+	if ondate:
+		ondate.stop()
+		stats = "Sei arrivato all'ondata %d con %d punti\n\n" % [ondate.wave, ondate.score]
+	hud.show_message("SEI FUORI GIOCO!\n\n%sPremi INVIO per tornare al menu" % stats)
+
+
+## CO-OP: tutti i giocatori a terra, la partita è finita (lo decide chi ospita, game/ondate.gd).
+func _on_all_down(wave: int, score: int) -> void:
+	game_over = true
+	if ondate:
+		ondate.stop()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	hud.show_message("SIETE TUTTI A TERRA!\n\nArrivati all'ondata %d con %d punti\n\nPremi INVIO per tornare al menu" % [wave, score])
 
 
 # ---------------------------------------------------------------- test automatici
@@ -242,6 +329,12 @@ func _parse_debug_args() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--shot="):
 			_shot_path = a.substr(7)
+		elif a.begins_with("--fps"):
+			_bench = 10.0 if a == "--fps" else float(a.substr(6))
+		elif a == "--pvp":
+			_auto_coop = false
+		elif a == "--nonemici":
+			nemici = false
 		elif a == "--autostart":
 			_auto = true
 		elif a.begins_with("--char="):

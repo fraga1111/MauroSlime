@@ -160,3 +160,19 @@ func take_hit(damage: float, pos_hit: Vector3, _dir: Vector3) -> bool:
 	var head := _prone_k < 0.5 and pos_hit.y - global_position.y > neck
 	hit.emit(peer_id, damage * (Config.HEADSHOT_MULT if head else 1.0))
 	return head
+
+
+# ---------------------------------------------------------------- per i nemici in co-op (game/ondate.gd)
+
+func is_alive() -> bool:
+	return _alive and _has_state
+
+
+## Altezza del petto da terra (dove mirano i nemici).
+func chest_height() -> float:
+	var h := Config.PLAYER_HEIGHT
+	if _crouch:
+		h = Config.PLAYER_CROUCH_HEIGHT
+	if _prone_k > 0.5:
+		h = Config.PLAYER_RADIUS * 2.0
+	return h * 0.65 * _scale

@@ -11,14 +11,10 @@ const KEYS := {
 	"super_jump": [KEY_B],
 	"sprint": [KEY_SHIFT],
 	"crouch": [KEY_CTRL, KEY_C],      # tenuto = accovacciato; premuto mentre corri = scivolata
+	"slide": [KEY_F],                 # scivolata (anche da fermo: scivola dove guardi)
 	"prone": [KEY_Z],                 # premi una volta = a terra (strisci), di nuovo = in piedi
 	"front_view": [KEY_V],            # visuale frontale sì/no
 	"reload": [KEY_R],
-	"weapon_next": [KEY_Q],           # arma successiva (anche rotellina del mouse)
-	"weapon_1": [KEY_1, KEY_KP_1],    # evidenziatore   (l'ordine è quello di data/weapons.gd)
-	"weapon_2": [KEY_2, KEY_KP_2],    # spillatrice
-	"weapon_3": [KEY_3, KEY_KP_3],    # telefono
-	"weapon_4": [KEY_4, KEY_KP_4],    # spillatrice a pinza
 	"interact": [KEY_E],              # sali / scendi dalla macchinina o dall'aeroplanino (actors/veicolo.gd)
 	"lights": [KEY_L],                # fari della macchinina
 }

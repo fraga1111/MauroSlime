@@ -11,6 +11,9 @@ extends Node
 ## altri lo sente e mostra il pulsante per entrare senza scrivere l'IP (ui/menu.gd).
 ## VERSIONE: un codice calcolato dai file degli script; se due giocatori ce l'hanno diverso, il gioco avvisa.
 ##
+## MODO: chi ospita sceglie CO-OP (tutti insieme contro le ondate di nemici, game/ondate.gd; niente
+## danni tra amici) oppure TUTTI CONTRO TUTTI. Il modo viaggia nella presentazione di chi ospita (_info).
+##
 ## Questo nodo si chiama sempre "Rete" ed è figlio di Main: le chiamate rpc cercano lo stesso
 ## percorso su tutti i computer.
 
@@ -18,6 +21,7 @@ signal message(text: String)                 # avvisi da mostrare (entrato, usci
 signal joined                                 # client: collegato all'host, si può entrare in partita
 signal join_failed(text: String)
 signal host_closed
+signal coop_known                             # client: chi ospita ha detto che la partita è in CO-OP
 
 const Config := preload("res://scripts/config.gd")
 const Avatar := preload("res://scripts/actors/avatar.gd")
@@ -30,6 +34,7 @@ const SEND_RATE := 20.0                       # aggiornamenti al secondo
 
 var online := false
 var is_host := false
+var coop := false                             # true = tutti insieme contro le ondate (niente danni tra amici)
 ## Chi sono io: {"name", "char", "stile", "weapon"}; impostato da main.gd prima di ospitare/unirsi
 var my_info := {}
 ## Il giocatore locale (actors/player.gd), impostato da main.gd quando la partita parte
@@ -83,6 +88,7 @@ func leave() -> void:
 	multiplayer.multiplayer_peer = null
 	online = false
 	is_host = false
+	coop = false
 	if _beacon:
 		_beacon.close()
 		_beacon = null
@@ -181,6 +187,10 @@ Aggiornate tutti e due!" % [
 	av.hit.connect(_on_avatar_hit)
 	get_parent().add_child(av)
 	_avatars[id] = av
+	if id == 1 and bool(info.get("coop", false)) and not coop:
+		coop = true
+		coop_known.emit()
+	_apply_coop()
 	if first:
 		message.emit("%s è entrato in partita" % info.get("name", "?"))
 
@@ -249,8 +259,25 @@ func on_player_fired(to: Vector3, normal: Vector3, world: bool) -> void:
 
 
 func _on_avatar_hit(id: int, amount: float) -> void:
-	if online:
+	if online and not coop:
 		_hit.rpc_id(id, amount * Config.PVP_DAMAGE)
+
+
+## Omini degli altri giocatori (li usano i nemici in co-op come bersagli).
+func avatars() -> Array:
+	var out := []
+	for av in _avatars.values():
+		if is_instance_valid(av):
+			out.append(av)
+	return out
+
+
+## In co-op gli amici non si colpiscono: i loro omini non fermano i colpi (passano ai nemici dietro).
+func _apply_coop() -> void:
+	if not coop:
+		return
+	for av in avatars():
+		(av as Avatar).collision_layer = 0
 
 
 func _remove_avatar(id: int) -> void:

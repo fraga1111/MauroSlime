@@ -4,6 +4,8 @@ extends CanvasLayer
 ## Per le persone vere (MATTEO, BROSKI) il pulsante ASPETTO sceglie lo stile: BLENDER o MINECRAFT.
 ## In alto a destra il pannello MULTIPLAYER: OSPITA apre la partita su questo computer (gli amici
 ## sulla stessa rete scrivono il tuo IP), UNISCITI entra nella partita di chi ospita.
+## Il pulsante MODO (lo decide chi ospita): CO-OP = tutti insieme contro le ondate di nemici,
+## TUTTI CONTRO TUTTI = ci si spara tra amici.
 ## Le partite aperte sulla rete compaiono da sole come pulsanti "ENTRA" (le annuncia game/rete.gd);
 ## nome e ultimo IP vengono salvati (user://multiplayer.cfg) e ritrovati alla prossima apertura.
 ## Tasti: numeri o frecce sx/dx = personaggio, Q/E o frecce su/giu = arma, T = aspetto, Invio per giocare.
@@ -12,7 +14,7 @@ signal selected(index: int)
 signal weapon_selected(weapon: int)
 signal style_changed(index: int, stile: String)
 signal start_game(index: int, weapon: int, stile: String)
-signal host_game(index: int, weapon: int, stile: String, player_name: String)
+signal host_game(index: int, weapon: int, stile: String, player_name: String, coop: bool)
 signal join_game(index: int, weapon: int, stile: String, player_name: String, ip: String)
 
 const Characters := preload("res://scripts/data/characters.gd")
@@ -35,6 +37,8 @@ var _net_btns: Array[Button] = []
 ## ultimi nome e IP usati (restano quando si torna al menu)
 static var last_name := ""
 static var last_ip := ""
+static var coop := true           # modo della partita che ospiti: CO-OP (ondate) o TUTTI CONTRO TUTTI
+var _mode_btn: Button
 const SAVE := "user://multiplayer.cfg"
 var _found_box: VBoxContainer
 var _found := {}                  # ip -> {"name", "ver", "count", "t", "btn"}
@@ -103,7 +107,7 @@ func _ready() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(row)
 	_play_btn = _button(row, Vector2(300, 54))
-	_play_btn.text = "GIOCA  (Invio)"
+	_play_btn.text = "GIOCA OFFLINE  (Invio)"
 	_play_btn.pressed.connect(_play)
 	_style_btn = _button(row, Vector2(330, 54))
 	_style_btn.pressed.connect(toggle_style)
@@ -112,7 +116,7 @@ func _ready() -> void:
 	help.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	help.offset_top = -40.0
 	help.offset_bottom = -3.0
-	help.text = "WASD muovi · Shift (o tasto laterale del mouse) corri · Spazio salta · B super salto · Ctrl accovacciati, correndo scivoli · Z a terra\nClick sx spara · Click dx mira · R ricarica · 1-4, rotellina o Q cambia arma · T aspetto (Matteo, Broski) · V visuale frontale · E sali in macchinina o sull'aeroplanino · Esc libera il mouse"
+	help.text = "WASD muovi · Shift (o tasto laterale del mouse) corri · Spazio salta · B super salto · F scivolata · Ctrl accovacciati · Z a terra\nClick sx spara · Click dx mira · R ricarica · T aspetto (Matteo, Broski) · V visuale frontale · E sali in macchinina o sull'aeroplanino · Esc libera il mouse"
 	help.modulate = Color(1, 1, 1, 0.75)
 
 	_build_net_panel(root)
@@ -154,6 +158,14 @@ Gli amici sulla stessa rete scrivono questo IP e premono UNISCITI" % ", ".join(i
 	_name_edit.text = last_name
 	_name_edit.max_length = 16
 
+	_mode_btn = _button(box, Vector2(0, 40))
+	_mode_btn.add_theme_font_size_override("font_size", 17)
+	_mode_btn.pressed.connect(func() -> void:
+		coop = not coop
+		_save_settings()
+		_show_mode())
+	_show_mode()
+
 	var host_btn := _button(box, Vector2(0, 46))
 	host_btn.text = "OSPITA PARTITA"
 	host_btn.pressed.connect(_host)
@@ -192,6 +204,11 @@ Gli amici sulla stessa rete scrivono questo IP e premono UNISCITI" % ", ".join(i
 	_net_status.custom_minimum_size = Vector2(340, 0)
 	_net_status.visible = false
 	box.add_child(_net_status)
+
+
+func _show_mode() -> void:
+	_mode_btn.text = "MODO: CO-OP contro le ondate" if coop else "MODO: TUTTI CONTRO TUTTI"
+	_mode_btn.tooltip_text = "Lo decide chi ospita. Clicca per cambiare."
 
 
 func _process(_delta: float) -> void:
@@ -238,12 +255,14 @@ func _load_settings() -> void:
 		last_name = String(cf.get_value("rete", "nome", ""))
 	if last_ip == "":
 		last_ip = String(cf.get_value("rete", "ip", ""))
+	coop = bool(cf.get_value("rete", "coop", coop))
 
 
 func _save_settings() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("rete", "nome", last_name)
 	cf.set_value("rete", "ip", last_ip)
+	cf.set_value("rete", "coop", coop)
 	cf.save(SAVE)
 
 
@@ -270,7 +289,7 @@ func _host() -> void:
 	set_net_status("Apro la partita...")
 	var n := _player_name()
 	_save_settings()
-	host_game.emit(index, weapon, style_of(index), n)
+	host_game.emit(index, weapon, style_of(index), n, coop)
 
 
 func _join() -> void:

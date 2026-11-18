@@ -227,22 +227,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("front_view"):
 		set_front_view(not _front_view)
 		return
-	if captured or auto_test:
-		var n := Weapons.LIST.size()
-		if event.is_action_pressed("weapon_next"):
-			switch_weapon((weapon + 1) % n)
-			return
-		for i in n:
-			if event.is_action_pressed("weapon_%d" % (i + 1)):
-				switch_weapon(i)
-				return
-		if event is InputEventMouseButton and event.pressed:
-			if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				switch_weapon((weapon + 1) % n)
-				return
-			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-				switch_weapon((weapon + n - 1) % n)
-				return
+	# l'arma è quella scelta nel menu e resta quella per tutta la partita (niente 1-4, rotellina o Q)
 	if event is InputEventMouseMotion and captured:
 		var sens := mouse_sensitivity * (0.6 if aiming else 1.0)
 		var rel: Vector2 = event.relative
@@ -300,8 +285,9 @@ func _physics_process(delta: float) -> void:
 		elif _space_free(0.0, true):
 			_prone = true
 			_slide_t = 0.0
-	# scivolata: Ctrl premuto mentre corri
-	if captured and Input.is_action_just_pressed("crouch") and _sprint_grace > 0.0 and on_floor and not _prone:
+	# scivolata: F (sempre) oppure Ctrl premuto mentre corri
+	var slide_key := Input.is_action_just_pressed("slide") or (Input.is_action_just_pressed("crouch") and _sprint_grace > 0.0)
+	if captured and slide_key and on_floor and not _prone and _slide_t <= 0.0:
 		var hv0 := Vector3(velocity.x, 0.0, velocity.z)
 		_slide_dir = hv0.normalized() if hv0.length() > 0.5 else Basis(Vector3.UP, _yaw) * Vector3.FORWARD
 		_slide_speed = maxf(hv0.length(), BASE_SPRINT * speed_mult) * Config.SLIDE_BOOST
@@ -764,3 +750,14 @@ func heal(amount: float) -> void:
 func add_ammo(amount: int) -> void:
 	reserve += amount
 	ammo_changed.emit(mag, reserve, _reload_t > 0.0)
+
+
+# ---------------------------------------------------------------- per i nemici (game/ondate.gd)
+
+func is_alive() -> bool:
+	return alive
+
+
+## Altezza del petto da terra (dove mirano i nemici): più bassa se accovacciato o a terra.
+func chest_height() -> float:
+	return _height * 0.65
