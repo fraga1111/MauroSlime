@@ -1,6 +1,6 @@
 ---
 name: arma
-description: Aggiungere o cambiare un'arma di MauroSlime (dati in weapons.gd, modello in gun_models.gd, colpi colorati).
+description: Aggiungere o cambiare un'arma di Mauro of Duty (dati in weapons.gd, modello in gun_models.gd, colpi colorati).
 ---
 
 # /arma — nuova arma o modifica

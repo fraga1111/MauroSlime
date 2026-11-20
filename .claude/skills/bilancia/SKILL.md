@@ -1,6 +1,6 @@
 ---
 name: bilancia
-description: Cambiare numeri di gioco di MauroSlime (vita, velocità, salto, danno, cadenza, munizioni, ondate, slime, boss) senza toccare la logica.
+description: Cambiare numeri di gioco di Mauro of Duty (vita, velocità, salto, danno, cadenza, munizioni, ondate, slime, boss) senza toccare la logica.
 ---
 
 # /bilancia — solo numeri

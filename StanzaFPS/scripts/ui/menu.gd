@@ -2,13 +2,15 @@ extends CanvasLayer
 ## Menu: prima si sceglie il personaggio (una scheda per ogni voce di data/characters.gd),
 ## poi l'arma (un pulsante per ogni voce di data/weapons.gd).
 ## Per le persone vere (MATTEO, BROSKI) il pulsante ASPETTO sceglie lo stile: BLENDER o MINECRAFT.
-## In alto a destra il pannello MULTIPLAYER: OSPITA apre la partita su questo computer (gli amici
-## sulla stessa rete scrivono il tuo IP), UNISCITI entra nella partita di chi ospita.
+## In alto il logo "Mauro of Duty" (textures/logo_mauro_of_duty.png).
+## Il pulsante MULTIPLAYER (tasto M) apre al centro il pannello della rete: OSPITA apre la partita su questo
+## computer (gli amici sulla stessa rete scrivono il tuo IP), UNISCITI entra nella partita di chi ospita.
 ## Il pulsante MODO (lo decide chi ospita): CO-OP = tutti insieme contro le ondate di nemici,
 ## TUTTI CONTRO TUTTI = ci si spara tra amici.
 ## Le partite aperte sulla rete compaiono da sole come pulsanti "ENTRA" (le annuncia game/rete.gd);
 ## nome e ultimo IP vengono salvati (user://multiplayer.cfg) e ritrovati alla prossima apertura.
-## Tasti: numeri o frecce sx/dx = personaggio, Q/E o frecce su/giu = arma, T = aspetto, Invio per giocare.
+## Tasti: numeri o frecce sx/dx = personaggio, Q/E o frecce su/giu = arma, T = aspetto, M = multiplayer,
+## H = storico, Invio per giocare.
 
 signal selected(index: int)
 signal weapon_selected(weapon: int)
@@ -43,6 +45,10 @@ static var last_ip := ""
 static var coop := true           # modo della partita che ospiti: CO-OP (ondate) o TUTTI CONTRO TUTTI
 var _mode_btn: Button
 const SAVE := "user://multiplayer.cfg"
+var _mp_overlay: ColorRect        # velo + pannello MULTIPLAYER al centro (nascosto finché non lo apri)
+var _mp_btn: Button
+var _logo: TextureRect
+const LOGO := "res://textures/logo_mauro_of_duty.png"
 var _found_box: VBoxContainer
 var _found := {}                  # ip -> {"name", "ver", "count", "t", "btn"}
 var _listen: PacketPeerUDP
@@ -61,14 +67,11 @@ func _ready() -> void:
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(shade)
 
-	var title := _label(root, 78, HORIZONTAL_ALIGNMENT_CENTER)
-	title.text = "MAUROSLIME"
-	title.offset_top = 26.0
-	title.add_theme_color_override("font_color", Color(0.35, 0.95, 0.4))
-	title.add_theme_constant_override("outline_size", 14)
-	var sub := _label(root, 26, HORIZONTAL_ALIGNMENT_CENTER)
+	_build_logo(root)
+	var sub := _label(root, 24, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.text = "Scegli il tuo omino da 10 cm"
-	sub.offset_top = 128.0
+	sub.offset_top = 206.0
+	sub.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
 
 	# schede dei personaggi
 	var bar := HBoxContainer.new()
@@ -114,6 +117,9 @@ func _ready() -> void:
 	_play_btn.pressed.connect(_play)
 	_style_btn = _button(row, Vector2(330, 54))
 	_style_btn.pressed.connect(toggle_style)
+	_mp_btn = _button(row, Vector2(300, 54))
+	_mp_btn.add_theme_font_size_override("font_size", 19)
+	_mp_btn.pressed.connect(toggle_multiplayer)
 	var hist_btn := _button(row, Vector2(260, 54))
 	hist_btn.text = "STORICO E RECORD  (H)"
 	hist_btn.add_theme_font_size_override("font_size", 19)
@@ -129,6 +135,7 @@ func _ready() -> void:
 	_root = root
 	_build_net_panel(root)
 	_refresh()
+	_show_mp_button()
 	if "--storico" in OS.get_cmdline_user_args():
 		toggle_history.call_deferred()       # screenshot dello storico (con partite d'esempio, Storico.example)
 
@@ -140,6 +147,8 @@ func toggle_history() -> void:
 		_history.queue_free()
 		_history = null
 		return
+	if _mp_overlay.visible:
+		toggle_multiplayer()
 	var all := Storico.example() if "--storico" in OS.get_cmdline_user_args() else Storico.load_all()
 	# velo scuro su tutto il menu (sopra a ogni altro pezzo) e pannello opaco al centro
 	var dim := ColorRect.new()
@@ -241,34 +250,84 @@ func _cell(parent: Control, text: String, font_size: int, color: Color) -> Label
 	return l
 
 
-## Pannello MULTIPLAYER in alto a destra: nome, il tuo IP, OSPITA, IP dell'amico + UNISCITI.
+## Logo "Mauro of Duty" in alto al centro (textures/logo_mauro_of_duty.png, bordi già sfumati).
+## Se l'immagine non si carica resta il titolo scritto.
+func _build_logo(root: Control) -> void:
+	var tex: Texture2D = null
+	if ResourceLoader.exists(LOGO):
+		tex = load(LOGO)
+	else:
+		var img := Image.load_from_file(ProjectSettings.globalize_path(LOGO))
+		if img:
+			tex = ImageTexture.create_from_image(img)
+	if tex == null:
+		var title := _label(root, 72, HORIZONTAL_ALIGNMENT_CENTER)
+		title.text = "MAURO OF DUTY"
+		title.offset_top = 40.0
+		title.add_theme_color_override("font_color", Color(1.0, 0.8, 0.15))
+		title.add_theme_constant_override("outline_size", 14)
+		return
+	var logo := TextureRect.new()
+	logo.texture = tex
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	logo.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	logo.offset_left = -270.0
+	logo.offset_right = 270.0
+	logo.offset_top = 0.0
+	logo.offset_bottom = 205.0
+	logo.pivot_offset = Vector2(270.0, 102.0)
+	root.add_child(logo)
+	_logo = logo
+
+
+## Pannello MULTIPLAYER: si apre AL CENTRO dello schermo (pulsante MULTIPLAYER o tasto M), sopra un velo scuro.
+## Dentro: nome, il tuo IP, MODO, OSPITA, IP dell'amico + UNISCITI e le partite trovate sulla rete.
 func _build_net_panel(root: Control) -> void:
+	_mp_overlay = ColorRect.new()
+	_mp_overlay.color = Color(0, 0, 0, 0.72)
+	_mp_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_mp_overlay.z_index = 90
+	_mp_overlay.visible = false
+	root.add_child(_mp_overlay)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mp_overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	panel.offset_left = -420.0
-	panel.offset_right = -20.0
-	panel.offset_top = 20.0
-	var st := _style(Color(0.35, 0.95, 0.4), 0.8, 2)
-	st.content_margin_left = 16.0
-	st.content_margin_right = 16.0
-	st.content_margin_top = 12.0
-	st.content_margin_bottom = 12.0
+	panel.custom_minimum_size = Vector2(560, 0)
+	var st := _style(Color(0.35, 0.95, 0.4), 0.95, 3)
+	st.set_content_margin_all(22)
 	panel.add_theme_stylebox_override("panel", st)
-	root.add_child(panel)
+	center.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 10)
 	panel.add_child(box)
 
 	_load_settings()
 	var ips := Rete.local_ips()
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 12)
+	box.add_child(top)
 	var title := Label.new()
-	title.text = "MULTIPLAYER  ·  il tuo IP: %s" % (ips[0] if ips.size() > 0 else "nessuna rete")
-	title.tooltip_text = "Tutti i tuoi IP: %s
-Gli amici sulla stessa rete scrivono questo IP e premono UNISCITI" % ", ".join(ips)
-	title.mouse_filter = Control.MOUSE_FILTER_PASS
-	title.add_theme_font_size_override("font_size", 20)
+	title.text = "MULTIPLAYER"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 30)
 	title.add_theme_color_override("font_color", Color(0.35, 0.95, 0.4))
-	box.add_child(title)
+	top.add_child(title)
+	var close := _button(top, Vector2(170, 42))
+	close.text = "CHIUDI  (M)"
+	close.add_theme_font_size_override("font_size", 17)
+	close.pressed.connect(toggle_multiplayer)
+	var my_ip := Label.new()
+	my_ip.text = "il tuo IP: %s" % (ips[0] if ips.size() > 0 else "nessuna rete")
+	my_ip.tooltip_text = "Tutti i tuoi IP: %s
+Gli amici sulla stessa rete scrivono questo IP e premono UNISCITI" % ", ".join(ips)
+	my_ip.mouse_filter = Control.MOUSE_FILTER_PASS
+	my_ip.add_theme_font_size_override("font_size", 18)
+	my_ip.modulate = Color(1, 1, 1, 0.8)
+	box.add_child(my_ip)
 
 	_name_edit = _edit(box, "Il tuo nome")
 	if last_name == "":
@@ -319,9 +378,31 @@ Gli amici sulla stessa rete scrivono questo IP e premono UNISCITI" % ", ".join(i
 	_net_status = Label.new()
 	_net_status.add_theme_font_size_override("font_size", 15)
 	_net_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_net_status.custom_minimum_size = Vector2(340, 0)
+	_net_status.custom_minimum_size = Vector2(500, 0)
 	_net_status.visible = false
 	box.add_child(_net_status)
+
+
+## Apre / chiude il pannello MULTIPLAYER al centro (pulsante MULTIPLAYER, tasto M, CHIUDI, Esc).
+func toggle_multiplayer() -> void:
+	if not _mp_overlay.visible and _history and is_instance_valid(_history):
+		toggle_history()
+	_mp_overlay.visible = not _mp_overlay.visible
+	if _mp_overlay.visible and _name_edit.text.strip_edges() == "":
+		_name_edit.grab_focus()
+	elif not _mp_overlay.visible:
+		get_viewport().gui_release_focus()
+
+
+## Testo del pulsante MULTIPLAYER: avvisa quando sulla rete c'è una partita aperta.
+func _show_mp_button() -> void:
+	if _mp_btn == null:
+		return
+	var n := _found.size()
+	_mp_btn.text = "MULTIPLAYER  (M)" if n == 0 else "MULTIPLAYER · %d partit%s!" % [n, "a" if n == 1 else "e"]
+	var c := Color(0.35, 0.95, 0.4)
+	_mp_btn.add_theme_stylebox_override("normal", _style(c, 0.9, 4 if n > 0 else 2, c.darkened(0.6) if n > 0 else Color(0.05, 0.06, 0.08)))
+	_mp_btn.add_theme_stylebox_override("hover", _style(c, 0.95, 4, c.darkened(0.45)))
 
 
 func _show_mode() -> void:
@@ -330,8 +411,12 @@ func _show_mode() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _logo:
+		# il logo "respira" piano
+		_logo.scale = Vector2.ONE * (1.0 + sin(Time.get_ticks_msec() / 1000.0 * 1.6) * 0.015)
 	if _listen == null:
 		return
+	var before := _found.size()
 	var now := Time.get_ticks_msec() / 1000.0
 	while _listen.get_available_packet_count() > 0:
 		var parts := _listen.get_packet().get_string_from_utf8().split("|")
@@ -358,6 +443,8 @@ func _process(_delta: float) -> void:
 			_net_btns.erase(b)
 			b.queue_free()
 			_found.erase(ip)
+	if _found.size() != before:
+		_show_mp_button()
 
 
 func _exit_tree() -> void:
@@ -430,6 +517,8 @@ func _join() -> void:
 func set_net_status(text: String) -> void:
 	_net_status.text = text
 	_net_status.visible = text != ""
+	if text != "" and not _mp_overlay.visible:
+		toggle_multiplayer()             # il messaggio si deve vedere (es. "non riesco a collegarmi")
 	for b in _net_btns:
 		b.disabled = false
 
@@ -443,6 +532,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		# storico aperto: si chiude con H o Esc, gli altri tasti non fanno niente
 		if key == KEY_H or key == KEY_ESCAPE:
 			toggle_history()
+		get_viewport().set_input_as_handled()
+		return
+	if _mp_overlay.visible:
+		# multiplayer aperto: si chiude con M o Esc, gli altri tasti non cambiano il personaggio dietro
+		if key == KEY_M or key == KEY_ESCAPE:
+			toggle_multiplayer()
+		get_viewport().set_input_as_handled()
+		return
+	if key == KEY_M:
+		toggle_multiplayer()
 		get_viewport().set_input_as_handled()
 		return
 	if key == KEY_H:

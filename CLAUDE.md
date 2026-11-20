@@ -1,4 +1,4 @@
-# MauroSlime — guida al progetto
+# Mauro of Duty (ex MauroSlime) — guida al progetto
 
 Sparatutto in prima/terza persona fatto in **Godot 4.7.2 + GDScript**. Il giocatore è un omino alto
 10 cm dentro un vero ufficio di circa 3 × 4,5 m (ricostruito dalle foto in `ft/`). GIOCA OFFLINE: ondate di nemici
@@ -132,7 +132,7 @@ MauroSlime/
 | Luce generale / atmosfera | `world/world_setup.gd` | `add_environment()` |
 | Nuova texture (es. poster) | `world/textures.gd` | nuova funzione statica, poi in room.gd `quad(..., lit(Textures.nome()))` |
 | Comportamento dei nemici | `actors/nemico.gd` | movimento e mira in `_physics_process`, sparo in `_shoot`, colpi presi in `take_hit`; personaggi e statistiche per ondata in `game/ondate.gd` (`_spawn`) |
-| Multiplayer (ospita / unisciti, stessa rete) | `game/rete.gd`, `actors/avatar.gd`, `ui/menu.gd` | porta `PORT` (7777) e giocatori max in rete.gd; danno tra giocatori e rientro in `config.gd` (sezione multiplayer); pannello MULTIPLAYER in alto a destra del menu. La prima volta Windows chiede di consentire Godot sulla rete: rispondere Sì (reti private) |
+| Multiplayer (ospita / unisciti, stessa rete) | `game/rete.gd`, `actors/avatar.gd`, `ui/menu.gd` | porta `PORT` (7777) e giocatori max in rete.gd; danno tra giocatori e rientro in `config.gd` (sezione multiplayer); pannello MULTIPLAYER al centro del menu (pulsante MULTIPLAYER o tasto M, `toggle_multiplayer`). La prima volta Windows chiede di consentire Godot sulla rete: rispondere Sì (reti private) |
 | Co-op online (ondate tutti insieme) | `game/ondate.gd` (parte "rete"), `actors/nemico.gd` (`puppet`) | chi ospita comanda i nemici e li manda agli altri; gli altri hanno copie e mandano i colpi a chi ospita. Pulsante MODO nel menu (`coop` in `ui/menu.gd`); numeri in `config.gd` (sezione CO-OP). Chi muore rientra a fine ondata, se cadono tutti finisce |
 | Munizioni a terra (graffette) | `config.gd` + `world/room.gd` | sezione "munizioni" (ogni quanto, quante, caricatori) e `PICKUP_SPOTS`; modello in `game/munizioni.gd` |
 | Colpi colorati di un'arma | `data/weapons.gd` | campi `tracer` (colpo che vola) e `splat` (macchia sul muro) |
@@ -145,6 +145,8 @@ MauroSlime/
 | Tasti | `game/input_setup.gd` | dizionari `KEYS` e `MOUSE` |
 | Testi e grafica di HUD e menu | `ui/hud.gd`, `ui/menu.gd` | |
 | Posizione degli omini e della telecamera nel menu | `ui/menu_stage.gd` | costanti in cima (metri reali) |
+| Vetrina del menu: buio, fari, piatti girevoli (omino e arma) | `ui/menu_stage.gd` | costanti in cima: `ROOM_DIM`/`AMBIENT_DIM` (quanto è buio), `PLATE_*`, `GUN_*`, `SPOT_*` (fari), `SPIN`/`KICK` (giro del piatto e giro in più quando scegli) |
+| Logo del gioco | `textures/logo_mauro_of_duty.png` + `ui/menu.gd` (`_build_logo`) | il gioco si chiama **Mauro of Duty**; `config/name` in project.godot resta "MauroSlime FPS" apposta (da lì Godot sceglie la cartella dei salvataggi); il titolo della finestra lo mette `main.gd` |
 
 **Se cambi la stanza**, controlla anche: `ENEMY_SPAWNS`, `PLAYER_SPAWN`, `CAR_SPOT` e `PLANE_SPOT` (non dentro i mobili),
 le costanti di `ui/menu_stage.gd` (vetrina del menu), le pose di test in `main.gd` (`_apply_pose`)

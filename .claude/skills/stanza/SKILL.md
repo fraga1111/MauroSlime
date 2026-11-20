@@ -1,6 +1,6 @@
 ---
 name: stanza
-description: Spostare, aggiungere o cambiare mobili e oggetti dell'ufficio di MauroSlime (room.gd), luci, texture.
+description: Spostare, aggiungere o cambiare mobili e oggetti dell'ufficio di Mauro of Duty (room.gd), luci, texture.
 ---
 
 # /stanza — ufficio, mobili, luci

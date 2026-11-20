@@ -1,6 +1,6 @@
 ---
 name: scansione
-description: Trasformare una scansione 3D fatta col telefono (app KIRI, .obj + .jpg in persongg/<nome>/) in un personaggio di MauroSlime con tools/blender_scan.py.
+description: Trasformare una scansione 3D fatta col telefono (app KIRI, .obj + .jpg in persongg/<nome>/) in un personaggio di Mauro of Duty con tools/blender_scan.py.
 ---
 
 # /scansione — persona vera da scansione 3D

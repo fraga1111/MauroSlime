@@ -71,7 +71,7 @@ func _ready() -> void:
 	_hint.offset_bottom = -110.0
 	_hint.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
 	var title := _label(20, HORIZONTAL_ALIGNMENT_LEFT, VERTICAL_ALIGNMENT_TOP)
-	title.text = "MauroSlime  v0.4 · bozza · %s" % preload("res://scripts/game/rete.gd").version()
+	title.text = "Mauro of Duty  v0.5 · bozza · %s" % preload("res://scripts/game/rete.gd").version()
 	title.modulate = Color(1, 1, 1, 0.6)
 	_fps = _label(18, HORIZONTAL_ALIGNMENT_LEFT, VERTICAL_ALIGNMENT_TOP)
 	_fps.offset_top = 46.0

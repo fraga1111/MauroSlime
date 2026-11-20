@@ -1,6 +1,6 @@
 ---
 name: prova
-description: Controllo FINALE di MauroSlime dopo una modifica (check.sh rapido o completo + solo gli screenshot che servono). Usala una volta sola, alla fine del lavoro, non dopo ogni singola modifica.
+description: Controllo FINALE di Mauro of Duty dopo una modifica (check.sh rapido o completo + solo gli screenshot che servono). Usala una volta sola, alla fine del lavoro, non dopo ogni singola modifica.
 ---
 
 # /prova — controllo finale, una volta sola

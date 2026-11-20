@@ -1,6 +1,6 @@
 ---
 name: personaggio
-description: Aggiungere o cambiare un personaggio giocabile di MauroSlime (omino a blocchi, persona vera con foto o con modello Blender). Dice quali file leggere e quali NO.
+description: Aggiungere o cambiare un personaggio giocabile di Mauro of Duty (omino a blocchi, persona vera con foto o con modello Blender). Dice quali file leggere e quali NO.
 ---
 
 # /personaggio — nuovo personaggio o modifica

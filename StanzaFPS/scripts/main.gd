@@ -66,6 +66,9 @@ var _extra: Array[String] = []
 
 
 func _ready() -> void:
+	# nome della finestra: config/name in project.godot resta "MauroSlime FPS" perché da lì Godot sceglie
+	# la cartella dei salvataggi (user://: storico e multiplayer.cfg), che così non si perdono
+	get_window().title = "Mauro of Duty"
 	InputSetup.setup()
 	WorldSetup.add_environment(self)
 	_nav = NavigationRegion3D.new()          # la stanza sta qui dentro: i nemici camminano sui suoi mobili

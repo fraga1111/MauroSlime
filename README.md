@@ -1,4 +1,6 @@
-# MauroSlime
+# Mauro of Duty
+
+Il gioco si chiamava **MauroSlime** (il repository e la cartella dei salvataggi hanno ancora quel nome).
 
 Sparatutto in terza persona fatto con **Godot 4.7.2**: sei un omino alto 10 cm dentro un vero ufficio,
 con evidenziatori, spillatrici e telefoni come armi. Si gioca anche in **multiplayer sulla stessa rete**.

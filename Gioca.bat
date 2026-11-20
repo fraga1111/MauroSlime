@@ -1,6 +1,6 @@
 @echo off
 rem ================================================================
-rem  MAUROSLIME - avvia il gioco
+rem  MAURO OF DUTY - avvia il gioco
 rem
 rem  Funziona in due modi:
 rem   - accanto alla cartella StanzaFPS (chi sviluppa il gioco): usa quella;
@@ -18,7 +18,7 @@ set "CASA=%LOCALAPPDATA%\MauroSlime"
 set "LOCALE=%CASA%\StanzaFPS"
 if not exist "%CASA%" mkdir "%CASA%"
 echo.
-echo   MAUROSLIME
+echo   MAURO OF DUTY
 
 rem ---- Godot: quello accanto a questo file, oppure scaricato una volta sola
 set "GDIR=%~dp0Godot"
